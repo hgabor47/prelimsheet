@@ -1,0 +1,165 @@
+:root {
+    --border-color: rgb(181, 181, 181);
+    --cell-width: 170px;
+    --cell-height: 30px;
+    --readonlycolor: #ebe0e0;
+    --thcolor:rgb(228, 228, 228);
+    --infosize:8px;
+}
+
+.ps_selectedcombo {
+    background-color: #f0f0f0 !important;
+    width: 96% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    font: inherit ;
+    padding: 5px !important;
+    outline: none !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.ps_selected {
+    background-color: #f0f0f0 !important;
+    border-right: 1px solid var(--border-color) ;
+    border-bottom: 1px solid var(--border-color) ;
+}
+.ps_rolereadonly {
+    background-color:  var(--readonlycolor) !important; 
+    border-right: 1px solid var(--border-color) ;
+    border-bottom: 1px solid var(--border-color) ;
+}
+.ps_readonly {
+    background-color:  var(--readonlycolor) !important; 
+    border-right: 1px solid var(--border-color) ;
+    border-bottom: 1px solid var(--border-color) ;
+}
+.ps_cell {
+    padding: 5px;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    background-color: #fafafa;
+    min-width: var(--cell-width);
+    min-height: var(--cell-height);
+    max-width: var(--cell-width);
+    max-height: var(--cell-height);
+    width: var(--cell-width);
+    height: var(--cell-height);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box; /* A padding és border nem növeli a cella méretét */
+    table-layout: fixed;
+    
+}
+
+.ps_table {
+    border-collapse: collapse;
+    border-left: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-color);
+    table-layout: fixed; /* A táblázat fix layoutot használ */
+    width: auto; /* Az alapértelmezett értéket használja, hogy ne nyúljon a képernyő méretéhez */
+}
+
+.table-responsive {
+    overflow-x: auto; /* Engedélyezi a vízszintes görgetést, ha a táblázat szélesebb a képernyőnél */
+}
+
+.ps_table td {
+    width: var(--cell-width); /* Minden td fix szélességű lesz */
+}
+
+th {
+    position: relative; /* Ez lehetővé teszi, hogy a benne lévő elemek abszolút helyzetben legyenek */
+    text-align: center;
+    font-style: normal;
+    font-size: 85%;
+    font-weight: 300;
+    padding: 0; /* Csökkenti a paddinget, hogy a fogantyúk elérhetőbbek legyenek */
+    background-color: var(--thcolor);
+}
+
+.ps_col-resize-handle {
+    position: absolute;
+    width: 5px;
+    cursor: col-resize;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    
+    border-left: 1px solid #ccc;
+    border-right: 1px solid #ccc;
+    z-index: 10;
+}
+
+.ps_row-resize-handle {
+    position: absolute;
+    height: 5px;
+    cursor: row-resize;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+    z-index: 10;
+}
+
+select:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: initial;
+    width:  96% !important;
+}
+select {
+    width: 96%;
+    outline: none;
+}
+
+
+/* Háromszög a cella jobb felső sarkában */
+.triangle-indicator {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-left: var(--infosize) solid transparent;
+    border-top: var(--infosize) solid rgb(65, 214, 97);
+    top: 0;
+    right: 0;
+    cursor: pointer;
+}
+
+/* Modális ablak stílus */
+.modal {
+    display: none; /* Alapértelmezés szerint rejtve */
+    position: fixed;
+    z-index: 1000;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    background-color: white;
+    color:black;
+    padding: 20px;
+    border: 1px solid #888;
+    box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.2);
+}
+
+/* Modális ablak háttér */
+.modal-background {
+    display: none; /* Alapértelmezés szerint rejtve */
+    position: fixed;
+    z-index: 999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Bezárás gomb a modális ablakban */
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+}
