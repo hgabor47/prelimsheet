@@ -3,5 +3,8 @@ Prelimutens javascript lightweight spreadsheet. An easy spreadsheet solution for
 
 Documentation and reference [https://github.com/hgabor47/prelimsheet/wiki]
 
+
+![Picture](https://github.com/hgabor47/prelimsheet/blob/main/doc/pic1.png?raw=true)
+
 :)
 Enjoy
