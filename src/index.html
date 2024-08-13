@@ -31,7 +31,7 @@
         spreadsheet.setUser("hgabor47",["user"])    //user and role(s) any
         sheet=spreadsheet.addSheet("Almafa");       // need a sheet for manipulation
         sheet.setSize(20,30);                      
-        sheet.setCellValue("B4", "Hello World itt van egy mező amibe bele tudtam írni"); //set a cellvalue
+        sheet.setCellValue("B4", "Hello World "); //set a cellvalue
         sheet.getCell("C5").readOnly(true);  //get a cell and set some attributes
         sheet.setCellValue("A1", 5,"Num");   //set a cell value 
         sheet.setCellValue("C5", "Testfile","Num"); //set a cell value
@@ -45,7 +45,7 @@
         sheet.setCellType(_CellTypes.TEXT, "Z1");
         sheet.setCellType(_CellTypes.TEXT, "AA1");        
 
-        sheet.getCell("B6").info = "<strong>Fontos:</strong> Ez egy fontos információ!";  //attach information to a cell
+        sheet.getCell("B6").info = "<strong>Important:</strong> Important information!";  //attach information to a cell
         sheet.getCell("B6").showInfo(true);  //... and user can show it
         console.log(spreadsheet.getCellDOM("B4").innerHTML); 
 
