@@ -1102,3 +1102,76 @@ class TEditImageLink extends TEditCell {
         this.DOMElement.remove();
     }
 }
+
+/*<script src="xlsx.js"></script>*/
+function loadExcel(file) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellStyles: true });
+
+        workbook.SheetNames.forEach(function(sheetName) {
+            const worksheet = workbook.Sheets[sheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref']); // Teljes tartomány lekérése
+            const newSheet = spreadsheet.addSheet(sheetName);
+
+            newSheet.setSize(range.e.r + 1, range.e.c + 1); // Méretezés a teljes tartomány alapján
+
+            for (let rowIndex = range.s.r; rowIndex <= range.e.r; rowIndex++) {
+                for (let colIndex = range.s.c; colIndex <= range.e.c; colIndex++) {
+                    const cellAddress = XLSX.utils.encode_cell({ c: colIndex, r: rowIndex });
+                    const cell = worksheet[cellAddress];
+
+                    if (cell) {
+                        const cellName = toCellName([colIndex, rowIndex]);
+                        const cellDOM = newSheet.getCell(cellName);
+                        cellDOM.setValue(cell.v); // Cell value beállítása
+
+                        // Stílusindex alapján formázás lekérése és alkalmazása
+                        if (cell.s) {
+                            const styleIndex = cell.s;
+                            const style = workbook.Styles.CellXf[styleIndex];
+
+                            if (style) {
+                                // Szöveg igazítása
+                                if (style.alignment) {
+                                    if (style.alignment.horizontal) {
+                                        cellDOM.TD.style.textAlign = style.alignment.horizontal;
+                                    }
+                                    if (style.alignment.vertical) {
+                                        cellDOM.TD.style.verticalAlign = style.alignment.vertical;
+                                    }
+                                }
+
+                                // Betűszín és háttérszín alkalmazása
+                                if (style.font && style.font.color && style.font.color.rgb) {
+                                    cellDOM.TD.style.color = `#${style.font.color.rgb.slice(2)}`;
+                                }
+
+                                if (style.fill && style.fill.fgColor && style.fill.fgColor.rgb) {
+                                    cellDOM.TD.style.backgroundColor = `#${style.fill.fgColor.rgb.slice(2)}`;
+                                }
+
+                                // Betűtípus, vastagság és egyéb jellemzők
+                                if (style.font) {
+                                    if (style.font.bold) {
+                                        cellDOM.TD.style.fontWeight = 'bold';
+                                    }
+                                    if (style.font.italic) {
+                                        cellDOM.TD.style.fontStyle = 'italic';
+                                    }
+                                    if (style.font.sz) {
+                                        cellDOM.TD.style.fontSize = `${style.font.sz}pt`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            spreadsheet.showSheet(spreadsheet.data.length - 1);
+        });
+    };
+    reader.readAsArrayBuffer(file);
+}
