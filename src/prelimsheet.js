@@ -92,7 +92,7 @@ console.log(toIndex("B2"));    // [1, 1]
 console.log(toIndex("AC45"));  // [28, 44]
 console.log(toIndex("Z100"));  // [25, 99]
 */
-function toCellaName(indices) {
+function toCellName(indices) {
     const [colIndex, rowIndex] = indices;
     const columnName = index2ColumnName(colIndex);
     const rowName = (rowIndex + 1).toString();
@@ -100,10 +100,10 @@ function toCellaName(indices) {
 }
 
 /* Példák használatra:
-console.log(toCellaName([0, 0]));    // A1
-console.log(toCellaName([1, 1]));    // B2
-console.log(toCellaName([28, 44]));  // AC45
-console.log(toCellaName([25, 99]));  // Z100
+console.log(toCellName([0, 0]));    // A1
+console.log(toCellName([1, 1]));    // B2
+console.log(toCellName([28, 44]));  // AC45
+console.log(toCellName([25, 99]));  // Z100
 */
 
 class TPRELIMSHEET {
@@ -117,10 +117,7 @@ class TPRELIMSHEET {
         this.selected = null; // [0,"B4"] // sheetindex, cellname 
         this.username = ""; // Felhasználói név
         this.userroles = []; // Felhasználói szerepkörök        
-
-        this.onEditStart = null;
-        this.onEditEnd = null;
-        this.onCellFocus = null;
+        this.currentSheetIndex = 0; // Az aktuálisan megjelenített sheet indexe
 
         document.addEventListener('keydown', (event) => {
             if (this.selected) {
@@ -148,6 +145,30 @@ class TPRELIMSHEET {
                 }
             }
         });  
+
+        this.onEditStart = null;
+        this.onEditEnd = null;
+        this.onCellFocus = null;
+        this.onchange = null; // Az onchange eseménykezelő
+        this.onsave = null;   // Az onsave eseménykezelő
+        this.onload = null;   // Az onload eseménykezelő        
+    }
+
+    // Sheet megjelenítése index alapján
+    showSheetByIndex(sheetindex) {
+        // Ellenőrizzük, hogy az index érvényes-e
+        if (sheetindex < 0 || sheetindex >= this.data.length) {
+            throw new Error("Invalid sheet index");
+        }
+
+        // Az aktuális sheet DOM elemének elrejtése
+        if (this.currentSheetIndex !== null) {
+            this.data[this.currentSheetIndex].DOMDIV.style.display = 'none';
+        }
+
+        // Az új sheet DOM elemének megjelenítése
+        this.currentSheetIndex = sheetindex;
+        this.data[sheetindex].DOMDIV.style.display = 'block';
     }
 
     moveSelection(rowOffset, colOffset) {
@@ -174,11 +195,18 @@ class TPRELIMSHEET {
         return this.data
     }
 
-    addSheet(name){
-        const sheet = new TSHEET(this,name)
+    // Sheet hozzáadása
+    addSheet(name) {
+        const sheet = new TSHEET(this, name);
         this.data.push(sheet);
-        return sheet
-    }
+
+        // Alapértelmezésben elrejtjük az új sheetet
+        if (this.data.length > 1) {
+            sheet.DOMDIV.style.display = 'none';
+        }
+
+        return sheet;
+    }    
 
     sheet(name){
         return this.data.find(sh => sh.name === name) || null;
@@ -215,6 +243,36 @@ class TPRELIMSHEET {
         });
     }
 }
+
+TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null) {
+    // CSV feldolgozása: sorokra bontás
+    const rows = csvcontent.split('\n').map(row => row.split(','));
+    
+    // Meghatározni a sorok és oszlopok számát
+    const numRows = rows.length;
+    const numCols = Math.max(...rows.map(row => row.length));
+
+    let sheet;
+    if (sheetindex === null) {
+        // Ha sheetindex null, akkor új sheet létrehozása
+        sheet = this.addSheet(`Sheet${this.data.length + 1}`);
+    } else {
+        // Egyébként a meglévő sheet kiválasztása
+        sheet = this.data[sheetindex];
+    }
+
+    // Sheet méretének beállítása a CSV adatok alapján
+    sheet.setSize(numRows, numCols);
+
+    // Cellák kitöltése a CSV tartalmával
+    rows.forEach((row, rowIndex) => {
+        row.forEach((cellValue, colIndex) => {
+            const cellName = toCellName([colIndex, rowIndex]);
+            sheet.setCellValue(cellName, cellValue.trim());
+        });
+    });
+};
+
 
 class TSHEET {
     constructor(parent, name = '') {

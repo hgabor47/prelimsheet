@@ -25,7 +25,9 @@
         </script>
     </div>
 
-    <button id="setAdminRoleBtn" class="btn btn-primary" onclick="setAdmin()">Set Role to Admin</button>
+    <button class="btn ps_btn-page" onclick="showSheet(0)">Sheet0</button>
+    <button class="btn ps_btn-page" onclick="showSheet(1)">Sheet1</button>
+    <button class="btn btn-primary" onclick="setAdmin()">Set Role to Admin</button>
     
     <script>
         spreadsheet.setUser("hgabor47",["user"])    //user and role(s) any
@@ -47,12 +49,28 @@
 
         sheet.getCell("B6").info = "<strong>Important:</strong> Important information!";  //attach information to a cell
         sheet.getCell("B6").showInfo(true);  //... and user can show it
+        
+        const csvContent = `
+            Name,Age,Location
+            Alice,30,New York
+            Bob,25,Los Angeles
+            Charlie,28,Chicago
+            `.trim();
+        spreadsheet.loadcsv(csvContent);
+        
+        
+        
+        
+        
         console.log(spreadsheet.getCellDOM("B4").innerHTML); 
 
         function setAdmin() {
             spreadsheet.setUser("hgabor47", ["admin","user"]);  //dynamic role change
             sheet.getCell("E2").celltype=_CellTypes.TEXT;       // ... and editable TEXT cell  
         };        
+        function showSheet(num){
+            spreadsheet.showSheetByIndex(num);
+        }
     </script>
 </body>
 </html>

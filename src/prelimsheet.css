@@ -53,6 +53,13 @@
     
 }
 
+.ps_btn-page {
+    border-bottom: 1px solid #ccc;
+    border-left: 1px solid #ccc;
+    border-right: 1px solid #ccc;
+}
+
+
 .ps_table {
     border-collapse: collapse;
     border-left: 1px solid var(--border-color);
