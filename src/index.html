@@ -58,6 +58,26 @@
             `.trim();
         spreadsheet.loadcsv(csvContent);
         
+        sheet2 = spreadsheet.getSheet(1)
+        sheet2.setCellType(_CellTypes.TEXT, "B2:C3"); //set a cell type from default NONE to TEXT so you cen edit 
+        spreadsheet.addComboTemplate('yesNo', [
+            { key: 'yes', value: 'Igen' },
+            { key: 'no', value: 'Nem' }
+        ]);
+        spreadsheet.addComboTemplate('Cars', [
+            { value: 'Volvo' }
+            ,{ value: 'Aston Martin' }
+            ,{ value: 'Kia' }
+            ,{ value: 'Mercedes' }
+            ,{ value: 'Volgswagen' }
+            ,{ value: 'Tesla' }
+        ]);        
+        //sheet2.setCellType(_CellTypes.COMBOBOX,"A2:A4");  comment because next line:
+        sheet2.setCell("A2:A4",function (cell){
+            cell.celltype = _CellTypes.COMBOBOX;
+            cell.comboTemplateName = "Cars";
+        });
+
         
         
         
@@ -69,7 +89,7 @@
             sheet.getCell("E2").celltype=_CellTypes.TEXT;       // ... and editable TEXT cell  
         };        
         function showSheet(num){
-            spreadsheet.showSheetByIndex(num);
+            spreadsheet.showSheet(num);
         }
     </script>
 </body>

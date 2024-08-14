@@ -118,6 +118,7 @@ class TPRELIMSHEET {
         this.username = ""; // Felhasználói név
         this.userroles = []; // Felhasználói szerepkörök        
         this.currentSheetIndex = 0; // Az aktuálisan megjelenített sheet indexe
+        this.combos = {}; // Combo template-ek tárolására szolgáló objektum
 
         document.addEventListener('keydown', (event) => {
             if (this.selected) {
@@ -154,23 +155,6 @@ class TPRELIMSHEET {
         this.onload = null;   // Az onload eseménykezelő        
     }
 
-    // Sheet megjelenítése index alapján
-    showSheetByIndex(sheetindex) {
-        // Ellenőrizzük, hogy az index érvényes-e
-        if (sheetindex < 0 || sheetindex >= this.data.length) {
-            throw new Error("Invalid sheet index");
-        }
-
-        // Az aktuális sheet DOM elemének elrejtése
-        if (this.currentSheetIndex !== null) {
-            this.data[this.currentSheetIndex].DOMDIV.style.display = 'none';
-        }
-
-        // Az új sheet DOM elemének megjelenítése
-        this.currentSheetIndex = sheetindex;
-        this.data[sheetindex].DOMDIV.style.display = 'block';
-    }
-
     moveSelection(rowOffset, colOffset) {
         //const sheet = this.data[0]; // Assuming a single sheet for now
         const [col, row,sheetindex] = parseCellId(this.selected.TD.id); // Parse the selected cell's ID
@@ -185,6 +169,49 @@ class TPRELIMSHEET {
             newCell.setClass(cellselect);
             this.selected = newCell;
         }
+    }
+
+    // Combótípus hozzáadása a template listához
+    addComboTemplate(name, options) {
+        this.combos[name] = options;
+    }
+
+    // Combo típus lekérése név alapján
+    getComboTemplate(name) {
+        return this.combos[name] || null;
+    }    
+
+    // Sheet megjelenítése index, név vagy TSHEET objektum alapján
+    showSheet(param) {
+        let sheet;
+
+        if (typeof param === 'number') {
+            // Ha numerikus adat, akkor index szerinti keresés
+            if (param < 0 || param >= this.data.length) {
+                throw new Error("Invalid sheet index");
+            }
+            sheet = this.data[param];
+        } else if (typeof param === 'string') {
+            // Ha szöveges adat, akkor név szerinti keresés
+            sheet = this.data.find(sh => sh.name === param);
+            if (!sheet) {
+                throw new Error("Sheet with name '" + param + "' not found");
+            }
+        } else if (param instanceof TSHEET) {
+            // Ha TSHEET objektum, akkor az adott sheetet használjuk
+            sheet = param;
+        } else {
+            throw new Error("Invalid parameter type");
+        }
+
+        // Az aktuális sheet DOM elemének elrejtése
+        if (this.currentSheetIndex !== null) {
+            this.data[this.currentSheetIndex].DOMDIV.style.display = 'none';
+        }
+
+        // Az új sheet DOM elemének megjelenítése
+        this.currentSheetIndex = this.data.indexOf(sheet);
+        sheet.DOMDIV.style.display = 'block';
     }
 
     addSheets(num) {
@@ -208,9 +235,22 @@ class TPRELIMSHEET {
         return sheet;
     }    
 
-    sheet(name){
-        return this.data.find(sh => sh.name === name) || null;
-    }
+    // getSheet by index or name
+    getSheet(param) {
+        if (typeof param === 'number') {
+            // Ha numerikus adat, akkor index szerinti keresés
+            if (param < 0 || param >= this.data.length) {
+                return null; // Érvénytelen index esetén null értéket adunk vissza
+            }
+            return this.data[param];
+        } else if (typeof param === 'string') {
+            // Ha szöveges adat, akkor név szerinti keresés
+            return this.data.find(sh => sh.name === param) || null;
+        } else {
+            // Ha a paraméter típusa nem string vagy number, akkor null értéket adunk vissza
+            return null;
+        }
+    }    
 
     getCellDOM(cellId) {
         const [col, row,sheet] = parseCellId(cellId);
@@ -370,6 +410,18 @@ class TSHEET {
             for (let colIndex = x1; colIndex <= x2; colIndex++) {
                 const cell = this.datarow[rowIndex].datacell[colIndex];
                 cell.celltype = celltype;
+            }
+        }
+    }
+    setCell(area = "",func) {
+        // Meghatározzuk az érintett területet az area függvénnyel
+        const [x1, y1, x2, y2] = this.area(area);
+
+        // Végigmegyünk a területen, és beállítjuk a cella típusát
+        for (let rowIndex = y1; rowIndex <= y2; rowIndex++) {
+            for (let colIndex = x1; colIndex <= x2; colIndex++) {
+                const cell = this.datarow[rowIndex].datacell[colIndex];
+                func(cell)                
             }
         }
     }
@@ -613,6 +665,7 @@ class TCELL {
         this.role = []; // csak ezek írhatják, de ha üres: mindenki 
         this.create(sheet, row, colindex);
         this.celltype=_CellTypes.NONE;
+        this.comboTemplateName=null;
         
         this.readonly=false;
         this.readOnly(false);
@@ -764,12 +817,17 @@ class TCELL {
                 break;
             }
             case  _CellTypes.COMBOBOX: {
-                const comboboxOptions = [
-                    { key: "", value: "Nincs érték" },
-                    { key: "igen", value: "Igen" },
-                    { key: "nem", value: "Nem" },
-                ];
-                const editor = new TEditCombobox(this, comboboxOptions);
+                let editor=null;
+                if (this.comboTemplateName==null){
+                    const comboboxOptions = [
+                        { key: "", value: "None" },
+                        { key: "yes", value: "yes" },
+                        { key: "no", value: "no" },
+                    ];
+                    editor = new TEditCombobox(this, comboboxOptions);
+                } else {
+                    editor = new TEditCombobox(this, this.comboTemplateName);
+                }
                 break;
             }
             case  _CellTypes.IMAGELINK: {
@@ -852,7 +910,11 @@ class TEditCell {
     }
 
     detach() {
+        try {
         this.DOMElement.remove();
+        } catch (e){
+            
+        }
     }
 }
 
@@ -888,18 +950,69 @@ class TEditTextarea extends TEditCell {
 }
 
 class TEditCombobox extends TEditCell {
-    constructor(parentCell, options) {
+    constructor(parentCell, optionsOrTemplateName) {
         super(parentCell);
-        this.options = options || [];     
-        this.attach()   
+        this.spreadsheet = this.parentCell.sheet.parent;
+
+        if (typeof optionsOrTemplateName === 'string') {
+            // Ha string, akkor template névként kezeljük
+            this.templateName = optionsOrTemplateName;
+
+            // Ellenőrizzük, hogy létezik-e a template
+            if (!this.spreadsheet.getComboTemplate(this.templateName)) {
+                throw new Error(`Combobox template "${this.templateName}" not found`);
+            }
+
+        } else if (Array.isArray(optionsOrTemplateName)) {
+            // Ha lista, akkor meg kell keresni vagy létrehozni a template-et
+            const existingTemplateName = TEditCombobox.findMatchingTemplate(this.spreadsheet,optionsOrTemplateName);
+            if (existingTemplateName) {
+                this.templateName = existingTemplateName;
+            } else {
+                // Ha nincs ilyen template, akkor újat hozunk létre
+                this.templateName = `template_${Object.keys(this.spreadsheet.combos).length + 1}`;
+                this.spreadsheet.addComboTemplate(this.templateName, optionsOrTemplateName);
+            }
+
+        } else {
+            throw new Error("Invalid parameter type for TEditCombobox. Expected string or array.");
+        }
+
+        this.attach();
+    }
+
+    // Statikus segédfüggvény, ami megkeresi, hogy van-e pontosan egyező template
+    static findMatchingTemplate(spreadsheet, options) {
+        for (const [templateName, templateOptions] of Object.entries(spreadsheet.combos)) {
+            if (TEditCombobox.compareOptions(templateOptions, options)) {
+                return templateName;
+            }
+        }
+        return null;
+    }
+
+    // Statikus segédfüggvény, ami összehasonlítja két opciós listát
+    static compareOptions(options1, options2) {
+        if (options1.length !== options2.length) return false;
+        for (let i = 0; i < options1.length; i++) {
+            if (options1[i].key !== options2[i].key || options1[i].value !== options2[i].value) {
+                return false;
+            }
+        }
+        return true;
     }
 
     attach() {
         const parentDOM = this.parentCell.TD;
+
+        // Lekérjük a combo template-et a név alapján
+        const options = this.spreadsheet.getComboTemplate(this.templateName);
+        if (!options) {
+            throw new Error(`Combobox template "${this.templateName}" not found`);
+        }        
+
         this.DOMElement = document.createElement('select');
         this.DOMElement.className = 'ps_selectedcell';
-        //this.DOMElement.style = parentDOM.style;
-        //this.DOMElement.style.all = "unset";
         this.DOMElement.style.width = '90%';
         this.DOMElement.style.height = parentDOM.style.height;
         this.DOMElement.style.margin = 0; // Megakadályozza, hogy a select eltérjen a cella pozíciójától
@@ -910,9 +1023,12 @@ class TEditCombobox extends TEditCell {
         this.DOMElement.style.border = '1px solid #ccc';
 
         // Add options to the combobox (options as key-value pairs)
-        this.options.forEach(option => {
+        options.forEach(option => {
             const optionElement = document.createElement('option');
-            optionElement.value = option.key;
+            if (!option.key)
+                optionElement.value = option.value;
+            else
+                optionElement.value = option.key;
             optionElement.textContent = option.value;
             this.DOMElement.appendChild(optionElement);
         });
