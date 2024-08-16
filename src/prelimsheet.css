@@ -4,6 +4,7 @@
     --cell-height: 30px;
     --readonlycolor: #ebe0e0;
     --thcolor:rgb(228, 228, 228);
+    --headcolor:rgb(245, 245, 245);
     --infosize:8px;
 }
 
@@ -53,11 +54,7 @@
     
 }
 
-.ps_btn-page {
-    border-bottom: 1px solid #ccc;
-    border-left: 1px solid #ccc;
-    border-right: 1px solid #ccc;
-}
+
 
 
 .ps_table {
@@ -172,19 +169,22 @@ select {
 }
 
 .tabs-container {
-    width: 100%; /* A tabs-container szélessége igazodik a táblázathoz */
-    background-color: var(--thcolor); /* A táblázat fejlécének színe */
-    border-top: 1px solid var(--border-color); /* Felső szegély, hogy elváljon a táblázattól */
+    width: fit-content; /* A tabs-container szélessége igazodik a táblázathoz */
+    /*background-color: var(--headcolor); /* A táblázat fejlécének színe */
+    /*border-top: 1px solid var(--border-color); /* Felső szegély, hogy elváljon a táblázattól */
     padding: 5px 0; /* Némi belső margó a fülek körül */
-    text-align: center; /* A fülek középre igazítása */
-    position: relative; /* Biztosítja, hogy a fülek a táblázathoz képest pozícionálva legyenek */
+    text-align: left; /* A fülek középre igazítása */
+    position: static; /* Biztosítja, hogy a fülek a táblázathoz képest pozícionálva legyenek */
     margin-top: 10px; /* Némi távolság a táblázat és a fülek között */
 }
 
 .tab-button {
     padding: 10px 15px; /* A tab gombok belső margója */
     background-color: var(--thcolor); /* A tab gombok alapértelmezett háttérszíne */
-    border: 1px solid var(--border-color); /* Szegély a tab gombok körül */
+    border-top: 1px solid var(--border-color);
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 0px solid var(--border-color);
     cursor: pointer;
     font-weight: bold; /* Félkövér betűstílus */
     color: #000; /* Szöveg színe */
@@ -198,3 +198,20 @@ select {
 .tab-button:hover {
     background-color: #eaeaea; /* Tab gomb színe hover esetén */
 }
+
+.context-menu {
+    background-color: white;
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    padding: 5px;
+}
+
+.context-menu div {
+    padding: 8px;
+    cursor: pointer;
+}
+
+.context-menu div:hover {
+    background-color: #f0f0f0;
+}
+

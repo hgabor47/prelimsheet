@@ -9,11 +9,11 @@
     <style>
         /* A scrollozható div stílusa */
         #div_id5 {
-            width: 90%;
+            width: 110%;
             height: 80vh;
             overflow: auto;
             border: 1px  dashed #ccc; /* Opcionális szegély */
-            padding: 5%; /* A belső margó */
+            padding: 1%; /* A belső margó */
             left:100px;
             max-width: 90%;
         }
@@ -32,8 +32,15 @@
 
     <!-- Load gomb -->
     <input type="file" id="file-input" style="display:none;" accept=".xlsx, .xls" />
-    <button class="btn btn-success" onclick="document.getElementById('file-input').click();">LOAD</button>
+    <button class="btn btn-success" onclick="document.getElementById('file-input').click();">LOAD</button>    
+
+    <button id="SAVE" class="btn btn-secondary" >SAVE</button>
+
+    <button class="btn btn-warning" onclick="document.getElementById('json-file-input').click();">LOAD JSON</button>
+    <input type="file" id="json-file-input" style="display:none;" accept=".json" />
     
+    <button class="btn btn-danger" onclick="spreadsheet.clearAll();">Clear All</button>
+
     <script>
         spreadsheet.setUser("hgabor47",["user"])    //user and role(s) any
         sheet=spreadsheet.addSheet("Almafa");       // need a sheet for manipulation
@@ -83,9 +90,12 @@
             cell.comboTemplateName = "Cars";
         });
         sheet.setCell("B2:B4",function (cell){
+            cell.setStyle("color:red;text-align:center;");  //store into stylemnager 
+            /*
+            DON'T USE DIRECT STYLE because it don't store into stylemanager
             const TD= cell.TD;
             TD.style.color="red";
-            TD.style.textAlign="center";
+            TD.style.textAlign="center";*/
         });
 
 
@@ -100,6 +110,19 @@
                 spreadsheet.loadExcel(file);
             }
         });
+
+        document.getElementById('SAVE').addEventListener('click', function(e) {
+            const jsonString = spreadsheet.convertToJson();
+            spreadsheet.saveToFile('spreadsheet_data.json', jsonString);
+        });
+        document.getElementById('json-file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                spreadsheet.clearAll();  // Táblázat alaphelyzetbe állítása a betöltés előtt
+                spreadsheet.loadFromFile(file);
+            }
+        });
+
 
  
         spreadsheet.onEditStart = function(cell,o) {

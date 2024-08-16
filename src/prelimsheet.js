@@ -120,7 +120,9 @@ class TPRELIMSHEET {
         this.currentSheetIndex = 0; // Az aktuálisan megjelenített sheet indexe
         this.combos = {}; // Combo template-ek tárolására szolgáló objektum
         this.isEdit = false;
-
+        this.lastColor = '#000000'; // Globális utolsó használt szín
+        this.lastBackgroundColor = '#ffffff'; // Globális utolsó használt háttérszín        
+        this.styleManager = new StyleManager();
         // Létrehozunk egy külön div-et a fülek számára
         this.tabsDiv = document.createElement('div');
         this.tabsDiv.className = 'tabs-container';
@@ -233,7 +235,7 @@ class TPRELIMSHEET {
 
         this.data.forEach((sheet, index) => {
             const tab = document.createElement('button');
-            tab.className = 'tab-button';
+            tab.className = 'tab-button ';
             tab.textContent = sheet.name;
             if (index === this.currentSheetIndex) {
                 tab.classList.add('active-tab');
@@ -429,6 +431,173 @@ TPRELIMSHEET.prototype.loadExcel = function(file) {
     reader.readAsArrayBuffer(file);
 }
 
+TPRELIMSHEET.prototype.convertToJson = function() {
+    // JSON objektum előkészítése
+    const json = {
+        head: {
+            combos: this.combos,           // A kombóboxok listája
+            styles: this.styleManager.styles    // A stíluskezelő által tárolt stílusok
+        },
+        sheets: []                         // A sheetek adatai kerülnek ide
+    };
+
+    // Sheetek adatainak mentése
+    this.data.forEach(sheet => {
+        const sheetData = {
+            name: sheet.name,                // Sheet neve
+            size: [sheet.rownum(), sheet.colnum()],  // Sheet mérete (sorok, oszlopok száma)
+            cells: [],                       // Cellák adatai
+            columns: [],                     // Oszlop adatok (szélességek)
+            rows: []                         // Sor adatok (magasságok)
+        };
+
+        // Oszlopok méretének mentése
+        sheet.datacol.forEach(col => {
+            sheetData.columns.push({
+                index: col.colindex,
+                width: col.width
+            });
+        });
+
+        // Sorok magasságának mentése
+        sheet.datarow.forEach(row => {
+            sheetData.rows.push({
+                index: row.name,
+                height: row.height
+            });
+        });
+
+        // Cellák mentése
+        sheet.datarow.forEach((row, rowIndex) => {
+            row.datacell.forEach((cell, colIndex) => {
+                const cellData = {
+                    id: `${index2ColumnName(colIndex)}${rowIndex + 1}`,  // Cella azonosító
+                    value: cell.getValue(),   // Cella értéke
+                    styleIndex: cell.styleIndex,  // Stílus index a stílustárban
+                    type: cell.celltype,      // Cella típusa (pl. TEXT, COMBOBOX stb.)
+                    comboTemplateName: cell.comboTemplateName,  // Combo template név (ha van)
+                    readonly: cell.readonly,  // Cella csak olvasható-e
+                    role: cell.role,          // Cella szerepkörei
+                    info: cell.info           // Cella információs szövege (ha van)
+                };
+                sheetData.cells.push(cellData);
+            });
+        });
+
+        // Sheet adatainak hozzáadása a JSON objektumhoz
+        json.sheets.push(sheetData);
+    });
+
+    // JSON objektum stringgé alakítása
+    const jsonString = JSON.stringify(json, null, 4);
+
+    return jsonString;
+};
+
+
+TPRELIMSHEET.prototype.saveToFile = function(filename, data) {
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+TPRELIMSHEET.prototype.loadFromFile = function(file) {
+    const spreadsheet = this;
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+        const jsonString = event.target.result;
+        spreadsheet.convertFromJson(jsonString);
+    };
+    
+    reader.readAsText(file);
+};
+
+TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
+    const jsonData = JSON.parse(jsonString);
+
+    // Kombó template-ek betöltése
+    if (jsonData.head.combos) {
+        for (const [name, options] of Object.entries(jsonData.head.combos)) {
+            this.addComboTemplate(name, options);
+        }
+    }
+
+    // Stílusok betöltése
+    if (jsonData.head.styles) {
+        this.styleManager.styles = jsonData.head.styles;
+    }
+
+    // Sheetek betöltése
+    jsonData.sheets.forEach(sheetData => {
+        const sheet = this.addSheet(sheetData.name);
+        sheet.setSize(sheetData.size[0], sheetData.size[1]);
+
+        // Oszlopok szélességének beállítása
+        sheetData.columns.forEach(col => {
+            sheet.setColWidth(index2ColumnName(col.index), col.width);
+        });
+
+        // Sorok magasságának beállítása
+        sheetData.rows.forEach(row => {
+            sheet.setRowHeight(row.index, row.height);
+        });
+
+        // Cellák betöltése
+        sheetData.cells.forEach(cellData => {
+            const cell = sheet.getCell(cellData.id);
+            cell.setValue(cellData.value);
+            cell.applyStyleByIndex(cellData.styleIndex);  // Stílus alkalmazása
+            cell.celltype = cellData.type || _CellTypes.NONE;
+            cell.comboTemplateName = cellData.comboTemplateName || null;
+            cell.readonly = cellData.readonly || false;
+            cell.role = cellData.role || [];
+            cell.info = cellData.info || "";
+            cell.showInfo(cellData.info ? true : false);
+        });
+    });
+
+    // Az első sheet megjelenítése
+    this.showSheet(0);
+};
+
+TPRELIMSHEET.prototype.clearAll = function() {
+    // Táblázat adatainak törlése
+    this.data.forEach(sheet => {
+        if (sheet.DOMDIV && sheet.DOMDIV.parentElement) {
+            sheet.DOMDIV.parentElement.removeChild(sheet.DOMDIV);
+        }
+    });
+    this.data = [];
+
+    // Kombó sablonok törlése
+    this.combos = {};
+
+    // Stílusok törlése
+    this.styleManager = new StyleManager();
+
+    // Kiválasztott cella alaphelyzetbe állítása
+    this.selected = null;
+
+    // Az aktuális sheet indexének alaphelyzetbe állítása
+    this.currentSheetIndex = 0;
+
+    // Felhasználói adatok alaphelyzetbe állítása
+    this.username = "";
+    this.userroles = [];
+
+    // Fülek frissítése (mivel nincs sheet, ez üres lesz)
+    this.updateTabs();
+};
+
+
+
 
 
 class TSHEET {
@@ -615,19 +784,21 @@ class TROW {
         this.selected = false;
         this.datacell = [];
         this.height = 30;
+        this.lastUsedColor = '#000000'; // Alapértelmezett szín
         this.create(sheet.DOMDIV, sheet);
+        this.createContextMenu(); // Kontextusmenü létrehozása
     }
 
-    create(DOMDIV, sheet) {
-
-
-        
+    create(DOMDIV, sheet) {        
         this.DOMTR = document.createElement('tr');
         DOMDIV.appendChild(this.DOMTR);
     
         // Create the row header cell (1, 2, 3, ...)
         const rowHeaderCell = document.createElement('th');
         rowHeaderCell.textContent = this.name; // Convert zero-based index to 1-based
+
+        // Kontextusmenü megjelenítése bal egérgombbal történő kattintásra
+        rowHeaderCell.addEventListener('click', (event) => this.showContextMenu(event));
     
         const resizeHandle = document.createElement('div');
         resizeHandle.className = 'ps_row-resize-handle';
@@ -638,11 +809,124 @@ class TROW {
         this.DOMTR.appendChild(rowHeaderCell);
     
         this.addCells(sheet.colnum);
-        /*for (let i = 0; i < sheet.colnum; i++) {
-            const cell = new TCELL(DOMDIV, sheet, this, i);
-            this.datacell.push(cell);
-        }*/
     }
+
+    createContextMenu() {
+        this.contextMenu = document.createElement('div');
+        this.contextMenu.className = 'context-menu';
+        this.contextMenu.style.display = 'none';
+        this.contextMenu.style.position = 'absolute';
+        this.contextMenu.style.zIndex = '1000';
+
+        const removeFormatsOption = document.createElement('div');
+        removeFormatsOption.textContent = 'Remove Formats';
+        removeFormatsOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.removeFormatsFromRow();
+        });
+
+        const colorOption = document.createElement('div');
+        colorOption.textContent = 'Color';
+        colorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.showColorPicker('color');
+        });
+
+        const backgroundColorOption = document.createElement('div');
+        backgroundColorOption.textContent = 'BackGroundColor';
+        backgroundColorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.showColorPicker('background-color');
+        });
+
+        const copyLastColorOption = document.createElement('div');
+        copyLastColorOption.textContent = 'CopyLastColor';
+        copyLastColorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.applyColorToRow('color', this.sheet.parent.lastColor);
+        });
+
+        const copyLastBackgroundColorOption = document.createElement('div');
+        copyLastBackgroundColorOption.textContent = 'CopyLastBackgroundColor';
+        copyLastBackgroundColorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.applyColorToRow('background-color', this.sheet.parent.lastBackgroundColor);
+        });
+
+        this.contextMenu.appendChild(removeFormatsOption);
+        this.contextMenu.appendChild(colorOption);
+        this.contextMenu.appendChild(backgroundColorOption);
+        this.contextMenu.appendChild(copyLastColorOption);
+        this.contextMenu.appendChild(copyLastBackgroundColorOption);
+
+        document.body.appendChild(this.contextMenu);
+
+        // A menü eltűnik, ha bárhová máshova kattintunk
+        document.addEventListener('click', () => {
+            this.contextMenu.style.display = 'none';
+        });
+    }
+
+    showContextMenu(event) {
+        // Megakadályozzuk, hogy az esemény más elemeken is lefusson
+        event.stopPropagation();
+        this.contextMenu.style.left = `${event.pageX}px`;
+        this.contextMenu.style.top = `${event.pageY}px`;
+        this.contextMenu.style.display = 'block';
+    }
+
+    showColorPicker(type) {
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = (type === 'color') ? this.lastUsedColor : this.lastUsedBackgroundColor;
+
+        colorInput.addEventListener('input', (event) => {
+            const color = event.target.value;
+            this.applyColorToRow(type, color);
+            if (type === 'color') {
+                this.lastUsedColor = color;
+                this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
+            } else {
+                this.lastUsedBackgroundColor = color;
+                this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
+            }
+        });
+
+        colorInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                const color = event.target.value;
+                this.applyColorToRow(type, color);
+                if (type === 'color') {
+                    this.lastUsedColor = color;
+                    this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
+                } else {
+                    this.lastUsedBackgroundColor = color;
+                    this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
+                }
+                document.body.removeChild(colorInput);
+            }
+        });
+
+        // Az input elem hozzáadása a DOM-hoz és kattintás triggerelése
+        document.body.appendChild(colorInput);
+        colorInput.click();
+
+        // Az input elem eltávolítása
+        colorInput.addEventListener('change', () => {
+            document.body.removeChild(colorInput);
+        });
+    }
+
+    applyColorToRow(type, color) {
+        this.datacell.forEach(cell => {
+            _updateCellStyle(cell, type, color);
+        });
+    }
+    removeFormatsFromRow() {
+        this.datacell.forEach(cell => {
+            cell.setStyle("");  // Törli az összes formázást a sor celláiról
+        });
+    }    
     
     startRowResize(event) {
         event.preventDefault();
@@ -692,8 +976,11 @@ class TCOL {
         this.colindex=colindex;
         this.name = index2ColumnName(this.colindex);
         this.selected = false;
-        this.width=170;      
+        this.width=170;    
+        this.lastUsedColor = '#000000'; 
+        this.lastUsedBackgroundColor = '#ffffff';
         this.createHeaders();  
+        this.createContextMenu();
     }
 
     createHeaders() {
@@ -711,6 +998,7 @@ class TCOL {
         th.appendChild(resizeHandle);
 
         resizeHandle.addEventListener('mousedown', (event) => this.startColResize(event, i));
+        th.addEventListener('click', (event) => this.showContextMenu(event));
         headerRow.appendChild(th);
         if (this.colindex==0)
             this.sheet.DOMDIV.insertBefore(headerRow,this.sheet.DOMDIV.childNodes[0])
@@ -718,7 +1006,129 @@ class TCOL {
             this.sheet.DOMDIV.childNodes[0].appendChild(th)
         }
         //this.sheet.DOMDIV.insert   appendChild(headerRow);
+
     }    
+
+    createContextMenu() {
+        this.contextMenu = document.createElement('div');
+        this.contextMenu.className = 'context-menu';
+        this.contextMenu.style.display = 'none';
+        this.contextMenu.style.position = 'absolute';
+        this.contextMenu.style.zIndex = '1000';
+
+        const removeFormatsOption = document.createElement('div');
+        removeFormatsOption.textContent = 'Remove Formats';
+        removeFormatsOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.removeFormatsFromColumn();
+        });
+
+        const colorOption = document.createElement('div');
+        colorOption.textContent = 'Color';
+        colorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.showColorPicker('color');
+        });
+
+        const backgroundColorOption = document.createElement('div');
+        backgroundColorOption.textContent = 'BackGroundColor';
+        backgroundColorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.showColorPicker('background-color');
+        });
+
+        const copyLastColorOption = document.createElement('div');
+        copyLastColorOption.textContent = 'CopyLastColor';
+        copyLastColorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.applyColorToColumn('color', this.sheet.parent.lastColor);
+        });
+
+        const copyLastBackgroundColorOption = document.createElement('div');
+        copyLastBackgroundColorOption.textContent = 'CopyLastBackgroundColor';
+        copyLastBackgroundColorOption.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.applyColorToColumn('background-color', this.sheet.parent.lastBackgroundColor);
+        });
+
+        this.contextMenu.appendChild(removeFormatsOption);
+        this.contextMenu.appendChild(colorOption);
+        this.contextMenu.appendChild(backgroundColorOption);
+        this.contextMenu.appendChild(copyLastColorOption);
+        this.contextMenu.appendChild(copyLastBackgroundColorOption);
+
+        document.body.appendChild(this.contextMenu);
+
+        // A menü eltűnik, ha bárhová máshova kattintunk
+        document.addEventListener('click', () => {
+            this.contextMenu.style.display = 'none';
+        });
+    }
+
+    showContextMenu(event) {
+        // Megakadályozzuk, hogy az esemény más elemeken is lefusson
+        event.stopPropagation();
+        this.contextMenu.style.left = `${event.pageX}px`;
+        this.contextMenu.style.top = `${event.pageY}px`;
+        this.contextMenu.style.display = 'block';
+    }
+
+    showColorPicker(type) {
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = (type === 'color') ? this.lastUsedColor : this.lastUsedBackgroundColor;
+
+        colorInput.addEventListener('input', (event) => {
+            const color = event.target.value;
+            this.applyColorToColumn(type, color);
+            if (type === 'color') {
+                this.lastUsedColor = color;
+                this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
+            } else {
+                this.lastUsedBackgroundColor = color;
+                this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
+            }
+        });
+
+        colorInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                const color = event.target.value;
+                this.applyColorToColumn(type, color);
+                if (type === 'color') {
+                    this.lastUsedColor = color;
+                    this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
+                } else {
+                    this.lastUsedBackgroundColor = color;
+                    this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
+                }
+                document.body.removeChild(colorInput);
+            }
+        });
+
+        // Az input elem hozzáadása a DOM-hoz és kattintás triggerelése
+        document.body.appendChild(colorInput);
+        colorInput.click();
+
+        // Az input elem eltávolítása
+        colorInput.addEventListener('change', () => {
+            document.body.removeChild(colorInput);
+        });
+    }
+
+    applyColorToColumn(type, color) {
+        this.sheet.datarow.forEach(row => {
+            const cell = row.datacell[this.colindex];
+            _updateCellStyle(cell, type, color);
+        });
+    }
+
+    removeFormatsFromColumn() {
+        this.sheet.datarow.forEach(row => {
+            const cell = row.datacell[this.colindex];
+            cell.setStyle("");  // Törli az összes formázást
+        });
+    }
+
     startColResize(event, colIndex) {
         event.preventDefault();
         const startX = event.clientX;
@@ -790,7 +1200,38 @@ class TCELL {
         this.info="" //info text, example if you implement a history 
         this.indicator = null; // Tároljuk a háromszög DOM elemét
         this.showInfo(false);
+        this.styleIndex = null; // Stílus index a StyleManager-ben
     } 
+
+    /**
+     * Stílus beállítása a cella számára.
+     * @param {string} styleString - A HTML stílus szövegként.
+     */
+    setStyle(styleString) {
+        // Megkeressük vagy hozzáadjuk a stílust a StyleManager-ben
+        this.styleIndex = this.sheet.parent.styleManager.addStyle(styleString);
+
+        // Alkalmazzuk a stílust a cellára
+        this.TD.style = styleString;
+    }
+    applyStyleByIndex(styleIndex) {
+        this.styleIndex = styleIndex;
+        const styleString = this.sheet.parent.styleManager.getStyleByIndex(styleIndex);
+        if (styleString) {
+            this.TD.style = styleString;
+        }
+    };    
+
+    /**
+     * Lekérjük a cellához tartozó stílust a StyleManager-ből.
+     * @returns {string} - A cella stílusa szövegként.
+     */
+    getStyle() {
+        if (this.styleIndex !== null) {
+            return this.sheet.parent.styleManager.getStyleByIndex(this.styleIndex);
+        }
+        return '';
+    }    
 
     showInfo(yes=true){
         if (yes)
@@ -1228,3 +1669,81 @@ class TEditImageLink extends TEditCell {
     }
 }
 
+
+
+class StyleManager {
+    constructor() {
+        this.styles = []; // A stílustár, ahol az összes stílus kombinációt tároljuk
+        this.addStyle("");
+    }
+
+    /**
+     * Adott stílus hozzáadása a stílustárhoz, ha még nem szerepel benne.
+     * @param {string} styleString - A HTML stílus szövegként.
+     * @returns {number} - A stílus indexe a stílustárban.
+     */
+    addStyle(styleString) {
+        const existingIndex = this.findStyleIndex(styleString);
+        if (existingIndex !== -1) {
+            return existingIndex; // Ha már létezik, visszaadjuk az indexét
+        }
+
+        // Ha nem létezik, hozzáadjuk a stílust a tárhoz, és visszaadjuk az új indexet
+        const newIndex = this.styles.length;
+        this.styles.push({ index: newIndex.toString(), style: styleString });
+        return newIndex;
+    }
+
+    /**
+     * Keres egy stílust a stílustárban.
+     * @param {string} styleString - A HTML stílus szövegként.
+     * @returns {number} - A stílus indexe, vagy -1 ha nem található.
+     */
+    findStyleIndex(styleString) {
+        return this.styles.findIndex(styleObj => styleObj.style === styleString);
+    }
+
+    /**
+     * Lekéri a stílust a stílustárból egy adott index alapján.
+     * @param {number} index - A stílus indexe.
+     * @returns {string} - A stílus szövegként.
+     */
+    getStyleByIndex(index) {
+        const styleObj = this.styles[index];
+        return styleObj ? styleObj.style : null;
+    }
+}
+
+
+function _updateCellStyle(cell, type, color) {
+    const currentStyle = cell.TD.style.cssText;
+
+    // Parse the current styles into an object
+    const styleObj = _parseStyleString(currentStyle);
+
+    // Update the relevant style
+    if (type === 'color') {
+        styleObj.color = color;
+    } else if (type === 'background-color') {
+        styleObj['background-color'] = color;
+    }
+
+    // Convert the style object back to a string and set it
+    const updatedStyle = _styleObjectToString(styleObj);
+    cell.setStyle(updatedStyle);
+}
+
+function _parseStyleString(styleString) {
+    const styleObj = {};
+    styleString.split(';').forEach(style => {
+        if (style) {
+            const [key, value] = style.split(':').map(item => item.trim());
+            styleObj[key] = value;
+        }
+    });
+    return styleObj;
+}
+
+function _styleObjectToString(styleObj) {
+    return Object.entries(styleObj).map(([key, value]) => `${key}: ${value}`).join('; ');
+}
