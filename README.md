@@ -4,9 +4,8 @@ Prelimutens javascript lightweight spreadsheet. An easy spreadsheet solution for
 Documentation and reference [https://github.com/hgabor47/prelimsheet/wiki]
 
 
-![Picture](https://github.com/hgabor47/prelimsheet/blob/main/doc/pic1.png?raw=true)
-![Picture](https://github.com/hgabor47/prelimsheet/blob/main/doc/picv0.2.png?raw=true)
-<img src="https://github.com/hgabor47/prelimsheet/blob/main/doc/picv0.2.png?raw=true" alt="My Image" width="300" >
+<img src="https://github.com/hgabor47/prelimsheet/blob/main/doc/pic1.png?raw=true" alt="My Image" width="500" >
+<img src="https://github.com/hgabor47/prelimsheet/blob/main/doc/picv0.2.png?raw=true" alt="My Image" width="500" >
 
 :)
 Enjoy
