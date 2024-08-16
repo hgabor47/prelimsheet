@@ -792,7 +792,18 @@ class TROW {
         rowHeaderCell.textContent = this.name; // Convert zero-based index to 1-based
 
         // Kontextusmenü megjelenítése bal egérgombbal történő kattintásra
-        rowHeaderCell.addEventListener('contextmenu', (event) => this.showContextMenu(event));
+        rowHeaderCell.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+
+            const options = [
+                { label: 'Remove Formats', action: (target) => target.removeFormatsFromRow() },
+                { label: 'Color', action: (target) => applyColor(target, 'color') },
+                { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
+                { label: 'CopyLastColor', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
+                { label: 'CopyLastBackgroundColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
+            ];
+            showContextMenu(event, this , options);
+        });
     
         const resizeHandle = document.createElement('div');
         resizeHandle.className = 'ps_row-resize-handle';
@@ -805,131 +816,7 @@ class TROW {
         this.addCells(sheet.colnum);
     }
 
-    createContextMenu() {
-        this.contextMenu = document.createElement('div');
-        this.contextMenu.className = 'context-menu';
-        this.contextMenu.style.display = 'none';
-        this.contextMenu.style.position = 'absolute';
-        this.contextMenu.style.zIndex = '1000';
-
-        const removeFormatsOption = document.createElement('div');
-        removeFormatsOption.textContent = 'Remove Formats';
-        removeFormatsOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.removeFormatsFromRow();
-            this.contextMenu.style.display = 'none';
-        });
-
-        const colorOption = document.createElement('div');
-        colorOption.textContent = 'Color';
-        colorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.showColorPicker('color');
-            this.contextMenu.style.display = 'none';
-        });
-
-        const backgroundColorOption = document.createElement('div');
-        backgroundColorOption.textContent = 'BackGroundColor';
-        backgroundColorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.showColorPicker('background-color');
-            this.contextMenu.style.display = 'none';
-        });
-
-        const copyLastColorOption = document.createElement('div');
-        copyLastColorOption.textContent = 'CopyLastColor';
-        copyLastColorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.applyColorToRow('color', this.sheet.parent.lastColor);
-            this.contextMenu.style.display = 'none';
-        });
-
-        const copyLastBackgroundColorOption = document.createElement('div');
-        copyLastBackgroundColorOption.textContent = 'CopyLastBackgroundColor';
-        copyLastBackgroundColorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.applyColorToRow('background-color', this.sheet.parent.lastBackgroundColor);
-            this.contextMenu.style.display = 'none';
-        });
-
-        this.contextMenu.appendChild(removeFormatsOption);
-        this.contextMenu.appendChild(colorOption);
-        this.contextMenu.appendChild(backgroundColorOption);
-        this.contextMenu.appendChild(copyLastColorOption);
-        this.contextMenu.appendChild(copyLastBackgroundColorOption);
-
-        document.body.appendChild(this.contextMenu);
-
-        // A menü eltűnik, ha bárhová máshova kattintunk
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.context-menu').forEach(menu => {
-                menu.remove(); // Eltávolítjuk a DOM-ból
-            });
-        });
-    }
-
-    showContextMenu(event) {
-        event.preventDefault();
-        if (event.target.classList.contains('ps_col-resize-handle')) {
-            return; // Ha a szélesség-állító elemre kattintottak, ne nyíljon meg a kontextusmenü
-        }
-
-        document.querySelectorAll('.context-menu').forEach(menu => {
-            menu.remove();
-        });
-
-        // Új kontextusmenü létrehozása
-        this.createContextMenu();
-        // Megakadályozzuk, hogy az esemény más elemeken is lefusson
-        event.stopPropagation();
-        this.contextMenu.style.left = `${event.pageX}px`;
-        this.contextMenu.style.top = `${event.pageY}px`;
-        this.contextMenu.style.display = 'block';
-    }
-
-    showColorPicker(type) {
-        const colorInput = document.createElement('input');
-        colorInput.type = 'color';
-        colorInput.value = (type === 'color') ? this.lastUsedColor : this.lastUsedBackgroundColor;
-
-        colorInput.addEventListener('input', (event) => {
-            const color = event.target.value;
-            this.applyColorToRow(type, color);
-            if (type === 'color') {
-                this.lastUsedColor = color;
-                this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
-            } else {
-                this.lastUsedBackgroundColor = color;
-                this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
-            }
-        });
-
-        colorInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                const color = event.target.value;
-                this.applyColorToRow(type, color);
-                if (type === 'color') {
-                    this.lastUsedColor = color;
-                    this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
-                } else {
-                    this.lastUsedBackgroundColor = color;
-                    this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
-                }
-                document.body.removeChild(colorInput);
-            }
-        });
-
-        // Az input elem hozzáadása a DOM-hoz és kattintás triggerelése
-        document.body.appendChild(colorInput);
-        colorInput.click();
-
-        // Az input elem eltávolítása
-        colorInput.addEventListener('change', () => {
-            document.body.removeChild(colorInput);
-        });
-    }
-
-    applyColorToRow(type, color) {
+    applyColorToElement(type, color) {
         this.datacell.forEach(cell => {
             _updateCellStyle(cell, type, color);
         });
@@ -1009,7 +896,19 @@ class TCOL {
         th.appendChild(resizeHandle);
 
         resizeHandle.addEventListener('mousedown', (event) => this.startColResize(event, i));
-        th.addEventListener('contextmenu', (event) => this.showContextMenu(event));
+        th.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+
+            const options = [
+                { label: 'Remove Formats', action: (target) => target.removeFormatsFromColumn() },
+                { label: 'Color', action: (target) => applyColor(target, 'color') },
+                { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
+                { label: 'CopyLastColor', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
+                { label: 'CopyLastBackgroundColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
+            ];
+            showContextMenu(event, this, options);
+        });
+
         headerRow.appendChild(th);
         if (this.colindex==0)
             this.sheet.DOMDIV.insertBefore(headerRow,this.sheet.DOMDIV.childNodes[0])
@@ -1020,133 +919,7 @@ class TCOL {
 
     }    
 
-    createContextMenu() {
-        this.contextMenu = document.createElement('div');
-        this.contextMenu.className = 'context-menu';
-        this.contextMenu.style.display = 'none';
-        this.contextMenu.style.position = 'absolute';
-        this.contextMenu.style.zIndex = '1000';
-
-        const removeFormatsOption = document.createElement('div');
-        removeFormatsOption.textContent = 'Remove Formats';
-        removeFormatsOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.removeFormatsFromColumn();
-            this.contextMenu.style.display = 'none';
-        });
-
-        const colorOption = document.createElement('div');
-        colorOption.textContent = 'Color';
-        colorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.showColorPicker('color');
-            this.contextMenu.style.display = 'none';
-        });
-
-        const backgroundColorOption = document.createElement('div');
-        backgroundColorOption.textContent = 'BackGroundColor';
-        backgroundColorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.showColorPicker('background-color');
-            this.contextMenu.style.display = 'none';
-            this.contextMenu.style.display = 'none';
-        });
-
-        const copyLastColorOption = document.createElement('div');
-        copyLastColorOption.textContent = 'CopyLastColor';
-        copyLastColorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.applyColorToColumn('color', this.sheet.parent.lastColor);
-            this.contextMenu.style.display = 'none';
-        });
-
-        const copyLastBackgroundColorOption = document.createElement('div');
-        copyLastBackgroundColorOption.textContent = 'CopyLastBackgroundColor';
-        copyLastBackgroundColorOption.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this.applyColorToColumn('background-color', this.sheet.parent.lastBackgroundColor);
-            this.contextMenu.style.display = 'none';
-        });
-
-        this.contextMenu.appendChild(removeFormatsOption);
-        this.contextMenu.appendChild(colorOption);
-        this.contextMenu.appendChild(backgroundColorOption);
-        this.contextMenu.appendChild(copyLastColorOption);
-        this.contextMenu.appendChild(copyLastBackgroundColorOption);
-
-        document.body.appendChild(this.contextMenu);
-
-        // A menü eltűnik, ha bárhová máshova kattintunk
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.context-menu').forEach(menu => {
-                menu.remove(); // Eltávolítjuk a DOM-ból
-            });
-        });
-    }
-
-    showContextMenu(event) {
-        event.preventDefault();
-        if (event.target.classList.contains('ps_col-resize-handle')) {
-            return; // Ha a szélesség-állító elemre kattintottak, ne nyíljon meg a kontextusmenü
-        }
-
-        document.querySelectorAll('.context-menu').forEach(menu => {
-            menu.remove();
-        });
-
-        // Új kontextusmenü létrehozása
-        this.createContextMenu();
-            
-        // Megakadályozzuk, hogy az esemény más elemeken is lefusson
-        event.stopPropagation();
-        this.contextMenu.style.left = `${event.pageX}px`;
-        this.contextMenu.style.top = `${event.pageY}px`;
-        this.contextMenu.style.display = 'block';
-    }
-
-    showColorPicker(type) {
-        const colorInput = document.createElement('input');
-        colorInput.type = 'color';
-        colorInput.value = (type === 'color') ? this.lastUsedColor : this.lastUsedBackgroundColor;
-
-        colorInput.addEventListener('input', (event) => {
-            const color = event.target.value;
-            this.applyColorToColumn(type, color);
-            if (type === 'color') {
-                this.lastUsedColor = color;
-                this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
-            } else {
-                this.lastUsedBackgroundColor = color;
-                this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
-            }
-        });
-
-        colorInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                const color = event.target.value;
-                this.applyColorToColumn(type, color);
-                if (type === 'color') {
-                    this.lastUsedColor = color;
-                    this.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
-                } else {
-                    this.lastUsedBackgroundColor = color;
-                    this.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
-                }
-                document.body.removeChild(colorInput);
-            }
-        });
-
-        // Az input elem hozzáadása a DOM-hoz és kattintás triggerelése
-        document.body.appendChild(colorInput);
-        colorInput.click();
-
-        // Az input elem eltávolítása
-        colorInput.addEventListener('change', () => {
-            document.body.removeChild(colorInput);
-        });
-    }
-
-    applyColorToColumn(type, color) {
+    applyColorToElement(type, color) {
         this.sheet.datarow.forEach(row => {
             const cell = row.datacell[this.colindex];
             _updateCellStyle(cell, type, color);
@@ -1307,7 +1080,22 @@ class TCELL {
         });        
         this.TD.addEventListener('dblclick', () => {
             this.editCell();
-        });       
+        });     
+        this.TD.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+
+            const options = [
+                { label: 'Edit', action: (target) => target.editCell() },
+                { label: 'Remove Formats', action: (target) => target.setStyle('') },
+                { label: 'Color', action: (target) => applyColor(target, 'color') },
+                { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
+            ];
+            showContextMenu(event, this, options);
+        });  
+    }
+
+    applyColorToElement(type, color) {
+        _updateCellStyle(this, type, color);
     }
 
     addInfoIndicator() {
@@ -1778,4 +1566,100 @@ function _parseStyleString(styleString) {
 
 function _styleObjectToString(styleObj) {
     return Object.entries(styleObj).map(([key, value]) => `${key}: ${value}`).join('; ');
+}
+
+
+/*context*/ 
+
+function createContextMenu(target, options) {
+    const contextMenu = document.createElement('div');
+    contextMenu.className = 'context-menu';
+    contextMenu.style.display = 'none';
+    contextMenu.style.position = 'absolute';
+    contextMenu.style.zIndex = '1000';
+
+    options.forEach(option => {
+        const optionElement = document.createElement('div');
+        optionElement.textContent = option.label;
+        optionElement.addEventListener('click', (event) => {
+            event.stopPropagation();
+            option.action(target);
+            contextMenu.remove(); // Kontextusmenü eltávolítása kattintás után
+        });
+        contextMenu.appendChild(optionElement);
+    });
+
+    return contextMenu;
+}
+
+function showContextMenu(event, target, options) {
+    event.preventDefault();
+
+    // Ellenőrizzük, hogy nem a szélesség-állító elemre kattintottak (ha van ilyen)
+    if (event.target.classList.contains('ps_col-resize-handle')) {
+        return;
+    }
+
+    // Először távolítsuk el az összes meglévő kontextusmenüt a DOM-ból
+    document.querySelectorAll('.context-menu').forEach(menu => {
+        menu.remove();
+    });
+
+    // Új kontextusmenü létrehozása
+    const contextMenu = createContextMenu(target, options);
+
+    document.body.appendChild(contextMenu); // Hozzáadjuk a DOM-hoz
+    contextMenu.style.left = `${event.pageX}px`;
+    contextMenu.style.top = `${event.pageY}px`;
+    contextMenu.style.display = 'block';
+
+    // A menü eltűnik, ha bárhová máshova kattintunk
+    document.addEventListener('click', () => {
+        contextMenu.remove();
+    }, { once: true });
+}
+
+/*show colorpicker */
+function applyColor(target, type) {
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    
+    // Alapértelmezett szín betöltése
+    colorInput.value = (type === 'color') ? target.lastUsedColor : target.lastUsedBackgroundColor;
+
+    colorInput.addEventListener('input', (event) => {
+        const color = event.target.value;
+        if (type === 'color') {
+            target.applyColorToElement('color', color);
+            target.lastUsedColor = color;
+            target.sheet.parent.lastColor = color; // Globális utolsó szín frissítése
+        } else {
+            target.applyColorToElement('background-color', color);
+            target.lastUsedBackgroundColor = color;
+            target.sheet.parent.lastBackgroundColor = color; // Globális utolsó háttérszín frissítése
+        }
+    });
+
+    colorInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            const color = event.target.value;
+            if (type === 'color') {
+                target.applyColorToElement('color', color);
+                target.lastUsedColor = color;
+                target.sheet.parent.lastColor = color;
+            } else {
+                target.applyColorToElement('background-color', color);
+                target.lastUsedBackgroundColor = color;
+                target.sheet.parent.lastBackgroundColor = color;
+            }
+            document.body.removeChild(colorInput);
+        }
+    });
+
+    document.body.appendChild(colorInput);
+    colorInput.click();
+
+    colorInput.addEventListener('change', () => {
+        document.body.removeChild(colorInput);
+    });
 }
