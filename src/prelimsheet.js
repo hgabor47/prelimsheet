@@ -432,65 +432,61 @@ TPRELIMSHEET.prototype.loadExcel = function(file) {
 }
 
 TPRELIMSHEET.prototype.convertToJson = function() {
-    // JSON objektum előkészítése
     const json = {
         head: {
-            combos: this.combos,           // A kombóboxok listája
-            styles: this.styleManager.styles    // A stíluskezelő által tárolt stílusok
+            combos: this.combos,           
+            styles: this.styleManager.styles    
         },
-        sheets: []                         // A sheetek adatai kerülnek ide
+        sheets: []                         
     };
 
-    // Sheetek adatainak mentése
     this.data.forEach(sheet => {
         const sheetData = {
-            name: sheet.name,                // Sheet neve
-            size: [sheet.rownum(), sheet.colnum()],  // Sheet mérete (sorok, oszlopok száma)
-            cells: [],                       // Cellák adatai
-            columns: [],                     // Oszlop adatok (szélességek)
-            rows: []                         // Sor adatok (magasságok)
+            name: sheet.name,                
+            size: [sheet.rownum(), sheet.colnum()],  
+            cells: [],                       
+            columns: [],                     
+            rows: []                         
         };
 
-        // Oszlopok méretének mentése
         sheet.datacol.forEach(col => {
             sheetData.columns.push({
                 index: col.colindex,
-                width: col.width
+                width: col.width,
+                lastUsedColor: col.lastUsedColor, // Mentjük az utoljára használt színt
+                lastUsedBackgroundColor: col.lastUsedBackgroundColor // Mentjük az utoljára használt háttérszínt
             });
         });
 
-        // Sorok magasságának mentése
         sheet.datarow.forEach(row => {
             sheetData.rows.push({
                 index: row.name,
-                height: row.height
+                height: row.height,
+                lastUsedColor: row.lastUsedColor, // Mentjük az utoljára használt színt
+                lastUsedBackgroundColor: row.lastUsedBackgroundColor // Mentjük az utoljára használt háttérszínt
             });
         });
 
-        // Cellák mentése
         sheet.datarow.forEach((row, rowIndex) => {
             row.datacell.forEach((cell, colIndex) => {
                 const cellData = {
-                    id: `${index2ColumnName(colIndex)}${rowIndex + 1}`,  // Cella azonosító
-                    value: cell.getValue(),   // Cella értéke
-                    styleIndex: cell.styleIndex,  // Stílus index a stílustárban
-                    type: cell.celltype,      // Cella típusa (pl. TEXT, COMBOBOX stb.)
-                    comboTemplateName: cell.comboTemplateName,  // Combo template név (ha van)
-                    readonly: cell.readonly,  // Cella csak olvasható-e
-                    role: cell.role,          // Cella szerepkörei
-                    info: cell.info           // Cella információs szövege (ha van)
+                    id: `${index2ColumnName(colIndex)}${rowIndex + 1}`,  
+                    value: cell.getValue(),   
+                    styleIndex: cell.styleIndex,  
+                    type: cell.celltype,      
+                    comboTemplateName: cell.comboTemplateName,  
+                    readonly: cell.readonly,  
+                    role: cell.role,          
+                    info: cell.info           
                 };
                 sheetData.cells.push(cellData);
             });
         });
 
-        // Sheet adatainak hozzáadása a JSON objektumhoz
         json.sheets.push(sheetData);
     });
 
-    // JSON objektum stringgé alakítása
     const jsonString = JSON.stringify(json, null, 4);
-
     return jsonString;
 };
 
@@ -522,38 +518,38 @@ TPRELIMSHEET.prototype.loadFromFile = function(file) {
 TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
     const jsonData = JSON.parse(jsonString);
 
-    // Kombó template-ek betöltése
     if (jsonData.head.combos) {
         for (const [name, options] of Object.entries(jsonData.head.combos)) {
             this.addComboTemplate(name, options);
         }
     }
 
-    // Stílusok betöltése
     if (jsonData.head.styles) {
         this.styleManager.styles = jsonData.head.styles;
     }
 
-    // Sheetek betöltése
     jsonData.sheets.forEach(sheetData => {
         const sheet = this.addSheet(sheetData.name);
         sheet.setSize(sheetData.size[0], sheetData.size[1]);
 
-        // Oszlopok szélességének beállítása
         sheetData.columns.forEach(col => {
-            sheet.setColWidth(index2ColumnName(col.index), col.width);
+            const colObj = sheet.datacol[col.index];
+            colObj.setWidth(col.width);
+            colObj.lastUsedColor = col.lastUsedColor || '#000000'; // Visszatöltjük az utoljára használt színt
+            colObj.lastUsedBackgroundColor = col.lastUsedBackgroundColor || '#ffffff'; // Visszatöltjük az utoljára használt háttérszínt
         });
 
-        // Sorok magasságának beállítása
         sheetData.rows.forEach(row => {
-            sheet.setRowHeight(row.index, row.height);
+            const rowObj = sheet.datarow[row.index - 1];
+            rowObj.setHeight(row.height);
+            rowObj.lastUsedColor = row.lastUsedColor || '#000000'; // Visszatöltjük az utoljára használt színt
+            rowObj.lastUsedBackgroundColor = row.lastUsedBackgroundColor || '#ffffff'; // Visszatöltjük az utoljára használt háttérszínt
         });
 
-        // Cellák betöltése
         sheetData.cells.forEach(cellData => {
             const cell = sheet.getCell(cellData.id);
             cell.setValue(cellData.value);
-            cell.applyStyleByIndex(cellData.styleIndex);  // Stílus alkalmazása
+            cell.applyStyleByIndex(cellData.styleIndex);  
             cell.celltype = cellData.type || _CellTypes.NONE;
             cell.comboTemplateName = cellData.comboTemplateName || null;
             cell.readonly = cellData.readonly || false;
@@ -563,7 +559,6 @@ TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
         });
     });
 
-    // Az első sheet megjelenítése
     this.showSheet(0);
 };
 
@@ -786,7 +781,6 @@ class TROW {
         this.height = 30;
         this.lastUsedColor = '#000000'; // Alapértelmezett szín
         this.create(sheet.DOMDIV, sheet);
-        this.createContextMenu(); // Kontextusmenü létrehozása
     }
 
     create(DOMDIV, sheet) {        
@@ -798,7 +792,7 @@ class TROW {
         rowHeaderCell.textContent = this.name; // Convert zero-based index to 1-based
 
         // Kontextusmenü megjelenítése bal egérgombbal történő kattintásra
-        rowHeaderCell.addEventListener('click', (event) => this.showContextMenu(event));
+        rowHeaderCell.addEventListener('contextmenu', (event) => this.showContextMenu(event));
     
         const resizeHandle = document.createElement('div');
         resizeHandle.className = 'ps_row-resize-handle';
@@ -823,6 +817,7 @@ class TROW {
         removeFormatsOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.removeFormatsFromRow();
+            this.contextMenu.style.display = 'none';
         });
 
         const colorOption = document.createElement('div');
@@ -830,6 +825,7 @@ class TROW {
         colorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.showColorPicker('color');
+            this.contextMenu.style.display = 'none';
         });
 
         const backgroundColorOption = document.createElement('div');
@@ -837,6 +833,7 @@ class TROW {
         backgroundColorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.showColorPicker('background-color');
+            this.contextMenu.style.display = 'none';
         });
 
         const copyLastColorOption = document.createElement('div');
@@ -844,6 +841,7 @@ class TROW {
         copyLastColorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.applyColorToRow('color', this.sheet.parent.lastColor);
+            this.contextMenu.style.display = 'none';
         });
 
         const copyLastBackgroundColorOption = document.createElement('div');
@@ -851,6 +849,7 @@ class TROW {
         copyLastBackgroundColorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.applyColorToRow('background-color', this.sheet.parent.lastBackgroundColor);
+            this.contextMenu.style.display = 'none';
         });
 
         this.contextMenu.appendChild(removeFormatsOption);
@@ -863,11 +862,24 @@ class TROW {
 
         // A menü eltűnik, ha bárhová máshova kattintunk
         document.addEventListener('click', () => {
-            this.contextMenu.style.display = 'none';
+            document.querySelectorAll('.context-menu').forEach(menu => {
+                menu.remove(); // Eltávolítjuk a DOM-ból
+            });
         });
     }
 
     showContextMenu(event) {
+        event.preventDefault();
+        if (event.target.classList.contains('ps_col-resize-handle')) {
+            return; // Ha a szélesség-állító elemre kattintottak, ne nyíljon meg a kontextusmenü
+        }
+
+        document.querySelectorAll('.context-menu').forEach(menu => {
+            menu.remove();
+        });
+
+        // Új kontextusmenü létrehozása
+        this.createContextMenu();
         // Megakadályozzuk, hogy az esemény más elemeken is lefusson
         event.stopPropagation();
         this.contextMenu.style.left = `${event.pageX}px`;
@@ -980,7 +992,6 @@ class TCOL {
         this.lastUsedColor = '#000000'; 
         this.lastUsedBackgroundColor = '#ffffff';
         this.createHeaders();  
-        this.createContextMenu();
     }
 
     createHeaders() {
@@ -998,7 +1009,7 @@ class TCOL {
         th.appendChild(resizeHandle);
 
         resizeHandle.addEventListener('mousedown', (event) => this.startColResize(event, i));
-        th.addEventListener('click', (event) => this.showContextMenu(event));
+        th.addEventListener('contextmenu', (event) => this.showContextMenu(event));
         headerRow.appendChild(th);
         if (this.colindex==0)
             this.sheet.DOMDIV.insertBefore(headerRow,this.sheet.DOMDIV.childNodes[0])
@@ -1021,6 +1032,7 @@ class TCOL {
         removeFormatsOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.removeFormatsFromColumn();
+            this.contextMenu.style.display = 'none';
         });
 
         const colorOption = document.createElement('div');
@@ -1028,6 +1040,7 @@ class TCOL {
         colorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.showColorPicker('color');
+            this.contextMenu.style.display = 'none';
         });
 
         const backgroundColorOption = document.createElement('div');
@@ -1035,6 +1048,8 @@ class TCOL {
         backgroundColorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.showColorPicker('background-color');
+            this.contextMenu.style.display = 'none';
+            this.contextMenu.style.display = 'none';
         });
 
         const copyLastColorOption = document.createElement('div');
@@ -1042,6 +1057,7 @@ class TCOL {
         copyLastColorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.applyColorToColumn('color', this.sheet.parent.lastColor);
+            this.contextMenu.style.display = 'none';
         });
 
         const copyLastBackgroundColorOption = document.createElement('div');
@@ -1049,6 +1065,7 @@ class TCOL {
         copyLastBackgroundColorOption.addEventListener('click', (event) => {
             event.stopPropagation();
             this.applyColorToColumn('background-color', this.sheet.parent.lastBackgroundColor);
+            this.contextMenu.style.display = 'none';
         });
 
         this.contextMenu.appendChild(removeFormatsOption);
@@ -1061,11 +1078,25 @@ class TCOL {
 
         // A menü eltűnik, ha bárhová máshova kattintunk
         document.addEventListener('click', () => {
-            this.contextMenu.style.display = 'none';
+            document.querySelectorAll('.context-menu').forEach(menu => {
+                menu.remove(); // Eltávolítjuk a DOM-ból
+            });
         });
     }
 
     showContextMenu(event) {
+        event.preventDefault();
+        if (event.target.classList.contains('ps_col-resize-handle')) {
+            return; // Ha a szélesség-állító elemre kattintottak, ne nyíljon meg a kontextusmenü
+        }
+
+        document.querySelectorAll('.context-menu').forEach(menu => {
+            menu.remove();
+        });
+
+        // Új kontextusmenü létrehozása
+        this.createContextMenu();
+            
         // Megakadályozzuk, hogy az esemény más elemeken is lefusson
         event.stopPropagation();
         this.contextMenu.style.left = `${event.pageX}px`;
@@ -1154,13 +1185,14 @@ class TCOL {
     }
 
     setWidth(px) {
+        this.width=px;
         this.sheet.datarow.forEach(row => {
             const cell = row.datacell[this.colindex];
             cell.TD.style.minWidth = `${px}px`;
             cell.TD.style.maxWidth = `${px}px`;
             cell.TD.style.width = `${px}px`;
         });
-        this.width=px;
+        
     }
 
     setClass(classname) {
