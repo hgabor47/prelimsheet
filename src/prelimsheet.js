@@ -797,16 +797,26 @@ class TROW {
             event.preventDefault();
 
             const options = [
-                { label: 'Remove Formats', action: (target) => target.removeFormatsFromRow() },
+                
+                { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
-                { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
-                { label: 'CopyLastColor', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
-                { label: 'CopyLastBackgroundColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
+                { label: 'BgColor', action: (target) => applyColor(target, 'background-color') },
+                { label: 'Paste Color', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
+                { label: 'Paste BgColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },                
                 {
                     label: 'ALIGN',
                     submenu: [
                         { label: 'Wrap Text', action: (target) => applyTextAlignment(target, 'wrap') },
                         { label: 'Clip Text', action: (target) => applyTextAlignment(target, 'clip') },
+                    ]
+                },
+                {
+                    label: 'INPUT',
+                    submenu: [
+                        { label: 'NONE', action: (target) => target.setCellType(_CellTypes.NONE) },
+                        { label: 'TEXT', action: (target) => target.setCellType(_CellTypes.TEXT) },
+                        { label: 'IMAGE', action: (target) => target.setCellType(_CellTypes.IMAGELINK) },
+                        { label: 'COMBOBOX', action: (target) => target.setCellType(_CellTypes.COMBOBOX) },
                     ]
                 }
             ];
@@ -879,6 +889,11 @@ class TROW {
         this.DOMTR.style.height = `${px}px`;
         this.height = px;
     }
+    setCellType(celltype) {
+        this.datacell.forEach(cell => {
+            cell.setCellType(celltype);
+        });
+    }    
 }
 
 
@@ -915,16 +930,25 @@ class TCOL {
             event.preventDefault();
 
             const options = [
-                { label: 'Remove Formats', action: (target) => target.removeFormatsFromColumn() },
+                { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
-                { label: 'CopyLastColor', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
-                { label: 'CopyLastBackgroundColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
+                { label: 'Paste Color', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
+                { label: 'Paste BgColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
                 {
                     label: 'ALIGN',
                     submenu: [
                         { label: 'Wrap Text', action: (target) => applyTextAlignment(target, 'wrap') },
                         { label: 'Clip Text', action: (target) => applyTextAlignment(target, 'clip') },
+                    ]
+                },
+                {
+                    label: 'INPUT',
+                    submenu: [
+                        { label: 'NONE', action: (target) => target.setCellType(_CellTypes.NONE) },
+                        { label: 'TEXT', action: (target) => target.setCellType(_CellTypes.TEXT) },
+                        { label: 'IMAGE', action: (target) => target.setCellType(_CellTypes.IMAGELINK) },
+                        { label: 'COMBOBOX', action: (target) => target.setCellType(_CellTypes.COMBOBOX) },
                     ]
                 }
             ];
@@ -996,7 +1020,12 @@ class TCOL {
         });
         
     }
-
+    setCellType(celltype) {
+        this.sheet.datarow.forEach(row => {
+            const cell = row.datacell[this.colindex];
+            cell.setCellType(celltype);
+        });
+    }
     setClass(classname) {
         this.sheet.datarow.forEach(row => row.datacell.forEach(cell => cell.setClass(classname)));
     }
@@ -1118,13 +1147,25 @@ class TCELL {
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
+                { label: 'Paste Color', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
+                { label: 'Paste BgColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },                
                 {
                     label: 'ALIGN',
                     submenu: [
                         { label: 'Wrap Text', action: (target) => applyTextAlignment(target, 'wrap') },
                         { label: 'Clip Text', action: (target) => applyTextAlignment(target, 'clip') },
                     ]
-                }            ];
+                },
+                {
+                    label: 'INPUT',
+                    submenu: [
+                        { label: 'NONE', action: (target) => target.setCellType(_CellTypes.NONE) },
+                        { label: 'TEXT', action: (target) => target.setCellType(_CellTypes.TEXT) },
+                        { label: 'IMAGE', action: (target) => target.setCellType(_CellTypes.IMAGELINK) },
+                        { label: 'COMBOBOX', action: (target) => target.setCellType(_CellTypes.COMBOBOX) },
+                    ]
+                }
+            ];
             showContextMenu(event, this, options);
         });  
     }
@@ -1279,6 +1320,9 @@ class TCELL {
     setClass(classname) {
         this.TD.classList.add(classname);
     }
+    setCellType(celltype) {
+        this.celltype = celltype;
+    }
 
     removeClass(classname) {
         this.TD.classList.remove(classname);
@@ -1313,7 +1357,7 @@ class TEditCell {
 
     attachKeyListener() {
         this.DOMElement.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 this.parentCell.setValue(this.getValue());
                 //this.detach(); // Remove the editor element
@@ -1613,9 +1657,11 @@ function _styleObjectToString(styleObj) {
 function createContextMenu(target, options) {
     const contextMenu = document.createElement('div');
     contextMenu.className = 'context-menu';
+    //contextMenu.style.fontSize = '70%'; // Kisebb betűméret beállítása
+
 
     options.forEach(option => {
-        const optionElement = document.createElement('div');
+        const optionElement = document.createElement('div');        
         optionElement.textContent = option.label;
 
         if (option.submenu) {
@@ -1624,6 +1670,7 @@ function createContextMenu(target, options) {
 
             option.submenu.forEach(subOption => {
                 const subOptionElement = document.createElement('div');
+                subOptionElement.className="context-menu_item";
                 subOptionElement.textContent = subOption.label;
                 subOptionElement.addEventListener('click', (event) => {
                     event.stopPropagation();
@@ -1636,6 +1683,7 @@ function createContextMenu(target, options) {
             optionElement.classList.add('has-submenu');
             optionElement.appendChild(submenu);
         } else {
+            optionElement.className="context-menu_item";
             optionElement.addEventListener('click', (event) => {
                 event.stopPropagation();
                 option.action(target);
@@ -1662,6 +1710,9 @@ function showContextMenu(event, target, options) {
     document.querySelectorAll('.context-menu').forEach(menu => {
         menu.remove();
     });
+    document.getElementsByName('colorinput').forEach(menu => {
+        menu.remove();
+    });    
 
     // Új kontextusmenü létrehozása
     const contextMenu = createContextMenu(target, options);
@@ -1674,6 +1725,9 @@ function showContextMenu(event, target, options) {
     // A menü eltűnik, ha bárhová máshova kattintunk
     document.addEventListener('click', () => {
         contextMenu.remove();
+        document.getElementsByName('colorinput').forEach(menu => {
+            menu.remove();
+        }); 
     }, { once: true });
 }
 
@@ -1681,6 +1735,7 @@ function showContextMenu(event, target, options) {
 /*show colorpicker */
 function applyColor(target, type) {
     const colorInput = document.createElement('input');
+    colorInput.name="colorinput";
     colorInput.type = 'color';
     
     // Alapértelmezett szín betöltése
@@ -1700,7 +1755,7 @@ function applyColor(target, type) {
     });
 
     colorInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
+        if (event.key === 'Enter' && !event.shiftKey) {
             const color = event.target.value;
             if (type === 'color') {
                 target.applyColorToElement('color', color);
@@ -1719,7 +1774,7 @@ function applyColor(target, type) {
     colorInput.click();
 
     colorInput.addEventListener('change', () => {
-        document.body.removeChild(colorInput);
+        try {document.body.removeChild(colorInput);} catch (error) {}
     });
 }
 
