@@ -6,6 +6,8 @@
     --thcolor:rgb(228, 228, 228);
     --headcolor:rgb(245, 245, 245);
     --infosize:8px;
+    --stickyrow:-2vh;
+    --stickycol:-2vh;
 }
 
 .ps_selectedcombo {
@@ -79,6 +81,7 @@ th {
     font-style: normal;
     font-size: 85%;
     font-weight: 300;
+    height:16px;
     padding: 0; /* Csökkenti a paddinget, hogy a fogantyúk elérhetőbbek legyenek */
     background-color: var(--thcolor);
 }
@@ -199,19 +202,72 @@ select {
     background-color: #eaeaea; /* Tab gomb színe hover esetén */
 }
 
+/* Kontextusmenü alapstílusok */
 .context-menu {
     background-color: white;
     border: 1px solid #ccc;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
     padding: 5px;
+    position: absolute;
+    z-index: 1000;
 }
 
 .context-menu div {
     padding: 8px;
     cursor: pointer;
+    position: relative; /* Az almenük elhelyezéséhez szükséges */
 }
 
 .context-menu div:hover {
     background-color: #f0f0f0;
 }
 
+/* Almenü stílusok */
+.context-submenu {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    background-color: white;
+    border: 1px solid #ccc;
+    display: none; /* Alapértelmezés szerint rejtve van */
+}
+
+.has-submenu:hover .context-submenu {
+    display: block; /* Hover esetén megjelenik az almenü */
+}
+
+.has-submenu::after {
+    content: '▶'; /* Nyíl mutatja, hogy van almenü */
+    position: absolute;
+    right: 10px;
+    top: 8px;
+}
+
+/* Wrap text stílus a cellához */
+.ps_cell_wrap {
+    white-space: normal; /* Engedélyezi a szöveg sortörését */
+    overflow: visible; /* Engedi, hogy a szöveg ne legyen vágva */
+    height: auto; /* A cella magassága automatikusan változik */
+    max-height: none; /* Eltávolítja a max-height korlátozást */
+}
+
+/*sticky row col*/
+
+.ps_table th,
+.ps_table td {
+    position: relative; /* Ez szükséges a sticky működéséhez */
+}
+
+.ps_table th.sticky-first-col,
+.ps_table td.sticky-first-col {
+    position: sticky;
+    left: var(--stickycol);
+    z-index: 1; /* Magasabb réteg, hogy ne takarják el a görgetett oszlopok */
+}
+
+.ps_table th.sticky-first-row,
+.ps_table td.sticky-first-row {
+    position: sticky;
+    top: var(--stickyrow);
+    z-index: 2; /* Magasabb réteg, hogy a görgetés alatt is látszódjon */
+}

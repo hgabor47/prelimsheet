@@ -789,6 +789,7 @@ class TROW {
     
         // Create the row header cell (1, 2, 3, ...)
         const rowHeaderCell = document.createElement('th');
+        rowHeaderCell.className="sticky-first-col";
         rowHeaderCell.textContent = this.name; // Convert zero-based index to 1-based
 
         // Kontextusmenü megjelenítése bal egérgombbal történő kattintásra
@@ -801,6 +802,13 @@ class TROW {
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
                 { label: 'CopyLastColor', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
                 { label: 'CopyLastBackgroundColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
+                {
+                    label: 'ALIGN',
+                    submenu: [
+                        { label: 'Wrap Text', action: (target) => applyTextAlignment(target, 'wrap') },
+                        { label: 'Clip Text', action: (target) => applyTextAlignment(target, 'clip') },
+                    ]
+                }
             ];
             showContextMenu(event, this , options);
         });
@@ -816,6 +824,11 @@ class TROW {
         this.addCells(sheet.colnum);
     }
 
+    applyStyleToElement(styleString) {
+        this.datacell.forEach(cell => {
+            cell.setStyle(styleString);
+        });
+    }
     applyColorToElement(type, color) {
         this.datacell.forEach(cell => {
             _updateCellStyle(cell, type, color);
@@ -886,9 +899,11 @@ class TCOL {
         // Create the header row (A, B, C, ...)
         const headerRow = document.createElement('tr');
         const emptyHeaderCell = document.createElement('th');
+        emptyHeaderCell.className="sticky-first-row";
         headerRow.appendChild(emptyHeaderCell); // Empty top-left corner
     
         const th = document.createElement('th');
+        th.className="sticky-first-row";
         th.textContent = index2ColumnName(i); // A, B, C, ...
 
         const resizeHandle = document.createElement('div');
@@ -905,6 +920,13 @@ class TCOL {
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
                 { label: 'CopyLastColor', action: (target) => target.applyColorToElement('color', this.sheet.parent.lastColor) },
                 { label: 'CopyLastBackgroundColor', action: (target) => target.applyColorToElement('background-color', this.sheet.parent.lastBackgroundColor) },
+                {
+                    label: 'ALIGN',
+                    submenu: [
+                        { label: 'Wrap Text', action: (target) => applyTextAlignment(target, 'wrap') },
+                        { label: 'Clip Text', action: (target) => applyTextAlignment(target, 'clip') },
+                    ]
+                }
             ];
             showContextMenu(event, this, options);
         });
@@ -918,6 +940,13 @@ class TCOL {
         //this.sheet.DOMDIV.insert   appendChild(headerRow);
 
     }    
+
+    applyStyleToElement(styleString) {
+        this.sheet.datarow.forEach(row => {
+            const cell = row.datacell[this.colindex];
+            cell.setStyle(styleString);
+        });
+    }
 
     applyColorToElement(type, color) {
         this.sheet.datarow.forEach(row => {
@@ -1089,9 +1118,19 @@ class TCELL {
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
-            ];
+                {
+                    label: 'ALIGN',
+                    submenu: [
+                        { label: 'Wrap Text', action: (target) => applyTextAlignment(target, 'wrap') },
+                        { label: 'Clip Text', action: (target) => applyTextAlignment(target, 'clip') },
+                    ]
+                }            ];
             showContextMenu(event, this, options);
         });  
+    }
+
+    applyStyleToElement(styleString) {
+        this.setStyle(styleString);
     }
 
     applyColorToElement(type, color) {
@@ -1574,23 +1613,42 @@ function _styleObjectToString(styleObj) {
 function createContextMenu(target, options) {
     const contextMenu = document.createElement('div');
     contextMenu.className = 'context-menu';
-    contextMenu.style.display = 'none';
-    contextMenu.style.position = 'absolute';
-    contextMenu.style.zIndex = '1000';
 
     options.forEach(option => {
         const optionElement = document.createElement('div');
         optionElement.textContent = option.label;
-        optionElement.addEventListener('click', (event) => {
-            event.stopPropagation();
-            option.action(target);
-            contextMenu.remove(); // Kontextusmenü eltávolítása kattintás után
-        });
+
+        if (option.submenu) {
+            const submenu = document.createElement('div');
+            submenu.className = 'context-submenu';
+
+            option.submenu.forEach(subOption => {
+                const subOptionElement = document.createElement('div');
+                subOptionElement.textContent = subOption.label;
+                subOptionElement.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    subOption.action(target);
+                    contextMenu.remove(); // Kontextusmenü eltávolítása kattintás után
+                });
+                submenu.appendChild(subOptionElement);
+            });
+
+            optionElement.classList.add('has-submenu');
+            optionElement.appendChild(submenu);
+        } else {
+            optionElement.addEventListener('click', (event) => {
+                event.stopPropagation();
+                option.action(target);
+                contextMenu.remove(); // Kontextusmenü eltávolítása kattintás után
+            });
+        }
+
         contextMenu.appendChild(optionElement);
     });
 
     return contextMenu;
 }
+
 
 function showContextMenu(event, target, options) {
     event.preventDefault();
@@ -1618,6 +1676,7 @@ function showContextMenu(event, target, options) {
         contextMenu.remove();
     }, { once: true });
 }
+
 
 /*show colorpicker */
 function applyColor(target, type) {
@@ -1663,3 +1722,23 @@ function applyColor(target, type) {
         document.body.removeChild(colorInput);
     });
 }
+
+function applyTextAlignment(target, alignmentType) {
+    if (alignmentType === 'wrap') {
+        const wrapStyle = `
+            white-space: normal;
+            overflow: visible;
+            height: auto;
+            max-height: none;
+        `;
+        target.applyStyleToElement(wrapStyle);
+    } else if (alignmentType === 'clip') {
+        const clipStyle = `
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        `;
+        target.applyStyleToElement(clipStyle);
+    }
+}
+
