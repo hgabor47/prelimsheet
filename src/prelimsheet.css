@@ -221,7 +221,6 @@ select {
 
 .context-menu_item:hover {
     background-color: #f0f0f0;
-
 }
 
 /* Almenü stílusok */
@@ -234,9 +233,13 @@ select {
     display: none; /* Alapértelmezés szerint rejtve van */
 }
 
+.has-submenu {
+    height:30px;
+}
+
 .has-submenu:hover .context-submenu {
     display: block; /* Hover esetén megjelenik az almenü */
-    
+    top:-24px;
 }
 
 .has-submenu::after {

@@ -779,6 +779,7 @@ class TROW {
         this.selected = false;
         this.datacell = [];
         this.height = 30;
+        this.visible = true;
         this.lastUsedColor = '#000000'; // Alapértelmezett szín
         this.create(sheet.DOMDIV, sheet);
     }
@@ -797,7 +798,7 @@ class TROW {
             event.preventDefault();
 
             const options = [
-                
+                { label: 'Hide', action: (target) => target.setVisible(false) },
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BgColor', action: (target) => applyColor(target, 'background-color') },
@@ -850,6 +851,15 @@ class TROW {
         });
     }    
     
+    setVisible(visible) {
+        this.visible = visible;
+        if (visible) {
+            this.DOMTR.style.display = '';            
+        } else {
+            this.DOMTR.style.display = 'none';
+        }
+    }
+
     startRowResize(event) {
         event.preventDefault();
         const startY = event.clientY;
@@ -930,6 +940,9 @@ class TCOL {
             event.preventDefault();
 
             const options = [
+                { label: 'Filter Empty', action: (target) => target.filterRowsByEmpty(true) },
+                { label: 'Filter NonEmpty', action: (target) => target.filterRowsByEmpty(false) },      
+                { label: 'Filter disable', action: (target) => target.clearFilter() },          
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
@@ -985,6 +998,26 @@ class TCOL {
             cell.setStyle("");  // Törli az összes formázást
         });
     }
+
+    filterRowsByEmpty(isEmpty) {
+        this.sheet.datarow.forEach(row => {
+            const cell = row.datacell[this.colindex];
+            const value = cell.getValue().trim();
+            if (isEmpty) {
+                // Filter Empty: Hide rows where cell is non-empty
+                row.setVisible(value === '');
+            } else {
+                // Filter NonEmpty: Hide rows where cell is empty
+                row.setVisible(value !== '');
+            }
+        });
+    }    
+    clearFilter() {
+        // Filter Off: Show all rows
+        this.sheet.datarow.forEach(row => {
+            row.setVisible(true);
+        });
+    }    
 
     startColResize(event, colIndex) {
         event.preventDefault();
