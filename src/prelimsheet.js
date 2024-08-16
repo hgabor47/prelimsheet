@@ -119,30 +119,38 @@ class TPRELIMSHEET {
         this.userroles = []; // Felhasználói szerepkörök        
         this.currentSheetIndex = 0; // Az aktuálisan megjelenített sheet indexe
         this.combos = {}; // Combo template-ek tárolására szolgáló objektum
+        this.isEdit = false;
 
+        // Létrehozunk egy külön div-et a fülek számára
+        this.tabsDiv = document.createElement('div');
+        this.tabsDiv.className = 'tabs-container';
+        this.DOM.appendChild(this.tabsDiv); // Hozzáadjuk a fő DOM elemhez
+                
         document.addEventListener('keydown', (event) => {
-            if (this.selected) {
-                switch (event.key) {
-                    case 'ArrowUp':
-                        this.moveSelection(-1, 0);
-                        event.preventDefault();
-                        break;
-                    case 'ArrowDown':
-                        this.moveSelection(1, 0);
-                        event.preventDefault();
-                        break;
-                    case 'ArrowLeft':
-                        this.moveSelection(0, -1);
-                        event.preventDefault();
-                        break;
-                    case 'ArrowRight':
-                        this.moveSelection(0, 1);
-                        event.preventDefault();
-                        break;
-                    case 'F2':
-                        this.selected.editCell(); // Trigger edit mode on the selected cell
-                        event.preventDefault();
-                        break;                  
+            if (!this.isEdit){
+                if (this.selected) {
+                    switch (event.key) {
+                        case 'ArrowUp':
+                            this.moveSelection(-1, 0);
+                            event.preventDefault();
+                            break;
+                        case 'ArrowDown':
+                            this.moveSelection(1, 0);
+                            event.preventDefault();
+                            break;
+                        case 'ArrowLeft':
+                            this.moveSelection(0, -1);
+                            event.preventDefault();
+                            break;
+                        case 'ArrowRight':
+                            this.moveSelection(0, 1);
+                            event.preventDefault();
+                            break;
+                        case 'F2':
+                            this.selected.editCell(); // Trigger edit mode on the selected cell
+                            event.preventDefault();
+                            break;                  
+                    }
                 }
             }
         });  
@@ -158,7 +166,7 @@ class TPRELIMSHEET {
     moveSelection(rowOffset, colOffset) {
         //const sheet = this.data[0]; // Assuming a single sheet for now
         const [col, row,sheetindex] = parseCellId(this.selected.TD.id); // Parse the selected cell's ID
-        sheet = this.data[sheetindex-1]
+        const sheet = this.data[sheetindex-1]
         const newRow = row + rowOffset;
         const newCol = col + colOffset;
 
@@ -168,6 +176,9 @@ class TPRELIMSHEET {
             this.selected.removeClass(cellselect);
             newCell.setClass(cellselect);
             this.selected = newCell;
+            if (typeof this.onCellFocus === 'function') {
+                this.onCellFocus(newCell); // Eseményhívás, amikor a cella kiválasztásra kerül
+            }
         }
     }
 
@@ -212,6 +223,28 @@ class TPRELIMSHEET {
         // Az új sheet DOM elemének megjelenítése
         this.currentSheetIndex = this.data.indexOf(sheet);
         sheet.DOMDIV.style.display = 'block';
+
+        // Frissítjük a füleket
+        this.updateTabs();        
+    }
+
+    updateTabs() {
+        this.tabsDiv.innerHTML = ''; // Töröljük a régi füleket
+
+        this.data.forEach((sheet, index) => {
+            const tab = document.createElement('button');
+            tab.className = 'tab-button';
+            tab.textContent = sheet.name;
+            if (index === this.currentSheetIndex) {
+                tab.classList.add('active-tab');
+            }
+
+            tab.addEventListener('click', () => {
+                this.showSheet(index);
+            });
+
+            this.tabsDiv.appendChild(tab);
+        });
     }
 
     addSheets(num) {
@@ -219,6 +252,7 @@ class TPRELIMSHEET {
             const sheet = new TSHEET(this);
             this.data.push(sheet);
         }
+        this.updateTabs(); // Frissítjük a füleket
         return this.data
     }
 
@@ -231,7 +265,7 @@ class TPRELIMSHEET {
         if (this.data.length > 1) {
             sheet.DOMDIV.style.display = 'none';
         }
-
+        this.updateTabs(); // Frissítjük a füleket
         return sheet;
     }    
 
@@ -285,6 +319,7 @@ class TPRELIMSHEET {
 }
 
 TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null) {
+    const spreadsheet3 = this;
     // CSV feldolgozása: sorokra bontás
     const rows = csvcontent.split('\n').map(row => row.split(','));
     
@@ -311,7 +346,89 @@ TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null) {
             sheet.setCellValue(cellName, cellValue.trim());
         });
     });
+
+    if (typeof spreadsheet3.onload === 'function') {
+        spreadsheet3.onload(spreadsheet3,sheet); // Eseményhívás betöltéskor
+    }
 };
+
+/*<script src="xlsx.js"></script>*/
+TPRELIMSHEET.prototype.loadExcel = function(file) {
+    const spreadsheet3 = this;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellStyles: true });
+
+        workbook.SheetNames.forEach(function(sheetName) {
+            const worksheet = workbook.Sheets[sheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref']); // Teljes tartomány lekérése
+            const newSheet = spreadsheet3.addSheet(sheetName);
+
+            newSheet.setSize(range.e.r + 1, range.e.c + 1); // Méretezés a teljes tartomány alapján
+
+            for (let rowIndex = range.s.r; rowIndex <= range.e.r; rowIndex++) {
+                for (let colIndex = range.s.c; colIndex <= range.e.c; colIndex++) {
+                    const cellAddress = XLSX.utils.encode_cell({ c: colIndex, r: rowIndex });
+                    const cell = worksheet[cellAddress];
+
+                    if (cell) {
+                        const cellName = toCellName([colIndex, rowIndex]);
+                        const cellDOM = newSheet.getCell(cellName);
+                        cellDOM.setValue(cell.v); // Cell value beállítása
+
+                        // Stílusindex alapján formázás lekérése és alkalmazása
+                        if (cell.s) {
+                            const styleIndex = cell.s;
+                            const style = workbook.Styles.CellXf[styleIndex];
+
+                            if (style) {
+                                // Szöveg igazítása
+                                if (style.alignment) {
+                                    if (style.alignment.horizontal) {
+                                        cellDOM.TD.style.textAlign = style.alignment.horizontal;
+                                    }
+                                    if (style.alignment.vertical) {
+                                        cellDOM.TD.style.verticalAlign = style.alignment.vertical;
+                                    }
+                                }
+
+                                // Betűszín és háttérszín alkalmazása
+                                if (style.font && style.font.color && style.font.color.rgb) {
+                                    cellDOM.TD.style.color = `#${style.font.color.rgb.slice(2)}`;
+                                }
+
+                                if (style.fill && style.fill.fgColor && style.fill.fgColor.rgb) {
+                                    cellDOM.TD.style.backgroundColor = `#${style.fill.fgColor.rgb.slice(2)}`;
+                                }
+
+                                // Betűtípus, vastagság és egyéb jellemzők
+                                if (style.font) {
+                                    if (style.font.bold) {
+                                        cellDOM.TD.style.fontWeight = 'bold';
+                                    }
+                                    if (style.font.italic) {
+                                        cellDOM.TD.style.fontStyle = 'italic';
+                                    }
+                                    if (style.font.sz) {
+                                        cellDOM.TD.style.fontSize = `${style.font.sz}pt`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            spreadsheet3.showSheet(spreadsheet3.data.length - 1);
+            if (typeof spreadsheet3.onload === 'function') {
+                spreadsheet3.onload(spreadsheet3,null); // Eseményhívás betöltéskor
+            }
+        });
+    };
+    reader.readAsArrayBuffer(file);
+}
+
 
 
 class TSHEET {
@@ -711,6 +828,9 @@ class TCELL {
             }
             this.setClass(cellselect); // Set the clicked cell's class to ps_selected
             sheet.parent.selected = this; // Update the selected cell in TPRELIMSHEET
+            if (typeof sheet.parent.onCellFocus === 'function') {
+                sheet.parent.onCellFocus(this); // Eseményhívás, amikor a cella kijelölésre kerül
+            }
         });        
         this.TD.addEventListener('dblclick', () => {
             this.editCell();
@@ -797,23 +917,21 @@ class TCELL {
         }
     }
 
+    editCellOnEditStart(t,editcell){
+        if (typeof t.sheet.parent.onEditStart === 'function') {
+            t.sheet.parent.isEdit=true;
+            t.sheet.parent.editCellOldValue=editcell.getValue();
+            t.sheet.parent.onEditStart(t,t.sheet.parent.editCellOldValue); // Eseményhívás szerkesztés indításakor
+        }        
+    }
 
     editCell() {
         if (!this.canEdit() || this.readonly) { return }
-        //const editor = new TEditTextarea(this);
-        
-        // const comboboxOptions = [
-        //     { key: "", value: "Nincs érték" },
-        //     { key: "igen", value: "Igen" },
-        //     { key: "nem", value: "Nem" },
-        // ];
-        // const comboboxEditor = new TEditCombobox(this, comboboxOptions);
-    
-        //const editor = new TEditImageLink(this);
 
         switch (this.celltype) {
             case  _CellTypes.TEXT: {
                 const editor = new TEditTextarea(this);
+                this.editCellOnEditStart(this,editor);
                 break;
             }
             case  _CellTypes.COMBOBOX: {
@@ -828,10 +946,12 @@ class TCELL {
                 } else {
                     editor = new TEditCombobox(this, this.comboTemplateName);
                 }
+                this.editCellOnEditStart(this,editor);        
                 break;
             }
             case  _CellTypes.IMAGELINK: {
                 const editor = new TEditImageLink(this);
+                this.editCellOnEditStart(this,editor);        
                 break;
             }
         }
@@ -896,7 +1016,7 @@ class TEditCell {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 this.parentCell.setValue(this.getValue());
-                this.detach(); // Remove the editor element
+                //this.detach(); // Remove the editor element
             } else if (event.key === 'Escape') {
                 event.preventDefault();
                 this.detach(); // Remove the editor element without saving
@@ -910,10 +1030,15 @@ class TEditCell {
     }
 
     detach() {
+        if (typeof this.parentCell.sheet.parent.onEditEnd === 'function') {
+            this.parentCell.sheet.parent.isEdit=false;
+            this.parentCell.sheet.parent.onEditEnd(this.parentCell,this.parentCell.sheet.parent.editCellOldValue,this.getValue()); // Eseményhívás szerkesztés befejezésekor
+        }
+    
         try {
-        this.DOMElement.remove();
-        } catch (e){
-            
+            this.DOMElement.remove();
+        } catch (e) {
+            // handle error if necessary
         }
     }
 }
@@ -1103,75 +1228,3 @@ class TEditImageLink extends TEditCell {
     }
 }
 
-/*<script src="xlsx.js"></script>*/
-function loadExcel(file) {
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellStyles: true });
-
-        workbook.SheetNames.forEach(function(sheetName) {
-            const worksheet = workbook.Sheets[sheetName];
-            const range = XLSX.utils.decode_range(worksheet['!ref']); // Teljes tartomány lekérése
-            const newSheet = spreadsheet.addSheet(sheetName);
-
-            newSheet.setSize(range.e.r + 1, range.e.c + 1); // Méretezés a teljes tartomány alapján
-
-            for (let rowIndex = range.s.r; rowIndex <= range.e.r; rowIndex++) {
-                for (let colIndex = range.s.c; colIndex <= range.e.c; colIndex++) {
-                    const cellAddress = XLSX.utils.encode_cell({ c: colIndex, r: rowIndex });
-                    const cell = worksheet[cellAddress];
-
-                    if (cell) {
-                        const cellName = toCellName([colIndex, rowIndex]);
-                        const cellDOM = newSheet.getCell(cellName);
-                        cellDOM.setValue(cell.v); // Cell value beállítása
-
-                        // Stílusindex alapján formázás lekérése és alkalmazása
-                        if (cell.s) {
-                            const styleIndex = cell.s;
-                            const style = workbook.Styles.CellXf[styleIndex];
-
-                            if (style) {
-                                // Szöveg igazítása
-                                if (style.alignment) {
-                                    if (style.alignment.horizontal) {
-                                        cellDOM.TD.style.textAlign = style.alignment.horizontal;
-                                    }
-                                    if (style.alignment.vertical) {
-                                        cellDOM.TD.style.verticalAlign = style.alignment.vertical;
-                                    }
-                                }
-
-                                // Betűszín és háttérszín alkalmazása
-                                if (style.font && style.font.color && style.font.color.rgb) {
-                                    cellDOM.TD.style.color = `#${style.font.color.rgb.slice(2)}`;
-                                }
-
-                                if (style.fill && style.fill.fgColor && style.fill.fgColor.rgb) {
-                                    cellDOM.TD.style.backgroundColor = `#${style.fill.fgColor.rgb.slice(2)}`;
-                                }
-
-                                // Betűtípus, vastagság és egyéb jellemzők
-                                if (style.font) {
-                                    if (style.font.bold) {
-                                        cellDOM.TD.style.fontWeight = 'bold';
-                                    }
-                                    if (style.font.italic) {
-                                        cellDOM.TD.style.fontStyle = 'italic';
-                                    }
-                                    if (style.font.sz) {
-                                        cellDOM.TD.style.fontSize = `${style.font.sz}pt`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            spreadsheet.showSheet(spreadsheet.data.length - 1);
-        });
-    };
-    reader.readAsArrayBuffer(file);
-}

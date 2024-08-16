@@ -9,25 +9,25 @@
     <style>
         /* A scrollozható div stílusa */
         #div_id5 {
-            width: 900px;
-            height: 600px;
+            width: 90%;
+            height: 80vh;
             overflow: auto;
             border: 1px  dashed #ccc; /* Opcionális szegély */
-            padding: 15%; /* A belső margó */
+            padding: 5%; /* A belső margó */
             left:100px;
+            max-width: 90%;
         }
     </style>    
 </head>
 <body>
     <h1>Prelimsheet demo</h1>
-    <div id="div_id5" style="padding: 5%;">
+    <div id="div_id5">
         <script>
             const spreadsheet = new TPRELIMSHEET( "almafák");  // the parent of the spreadsheet is div_id5 because the place 
         </script>
     </div>
 
-    <button class="btn ps_btn-page" onclick="showSheet(0)">Sheet0</button>
-    <button class="btn ps_btn-page" onclick="showSheet(1)">Sheet1</button>
+
     <button class="btn btn-primary" onclick="setAdmin()">Set Role to Admin</button>
 
     <!-- Load gomb -->
@@ -88,31 +88,43 @@
             TD.style.textAlign="center";
         });
 
-        
-        
-        
-        
-        console.log(spreadsheet.getCellDOM("B4").innerHTML); 
 
         function setAdmin() {
             spreadsheet.setUser("hgabor47", ["admin","user"]);  //dynamic role change
             sheet.getCell("E2").celltype=_CellTypes.TEXT;       // ... and editable TEXT cell  
         };        
-        function showSheet(num){
-            spreadsheet.showSheet(num);
-        }
-
-        
         // Excel fájl betöltése SheetJS használatával
         document.getElementById('file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                loadExcel(file);
+                spreadsheet.loadExcel(file);
             }
         });
 
  
+        spreadsheet.onEditStart = function(cell,o) {
+            console.log('Szerkesztés indítása a cellában:', cell.TD.id,o);
+        };
 
+        spreadsheet.onEditEnd = function(cell,o,n) {
+            console.log('Szerkesztés befejezése a cellában:', cell.TD.id,o,n);
+        };
+
+        spreadsheet.onCellFocus = function(cell) {
+            console.log('Cella kijelölve:', cell.TD.id);
+        };
+
+        spreadsheet.onchange = function(cell) {
+            console.log('Cella értéke megváltozott:', cell.TD.id, 'Új érték:', cell.getValue());
+        };
+
+        spreadsheet.onsave = function() {
+            console.log('Adatok mentésre kerültek');
+        };
+
+        spreadsheet.onload = function() {
+            console.log('Adatok betöltve');
+        };
 
         
     </script>
