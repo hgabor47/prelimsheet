@@ -619,6 +619,12 @@ class TSHEET {
         //this.createHeaders();
     }
 
+    unhideAllRows() {
+        this.datarow.forEach(row => {
+            row.setVisible(true);
+        });
+    }
+    
     area(value) {
         const totalRows = this.rownum();
         const totalCols = this.colnum();
@@ -722,18 +728,20 @@ class TSHEET {
     
 
     addRows(num) {
+        const currentRowCount = this.rownum();
         for (let i = 0; i < num; i++) {
-            const row = new TROW(this, i+1);
+            const row = new TROW(this, currentRowCount + i + 1); // Folytatjuk a sorszámozást
             this.datarow.push(row);
         }
     }
-
+    
     addCols(num) {
+        const currentColCount = this.colnum();
         for (let i = 0; i < num; i++) {
-            const col = new TCOL(this, i);
+            const col = new TCOL(this, currentColCount + i); // Folytatjuk az oszlopszámozást
             this.datacol.push(col);
             this.datarow.forEach(row => {
-                row.addCells(1);
+                row.addCells(1); // Hozzáadunk egy cellát az új oszlophoz minden sorban
             });
         }
     }
@@ -747,7 +755,21 @@ class TSHEET {
     }
 
     setCellValue(cellId, value, valuetype = "string") {
-        const [col, row,sheet] = parseCellId(cellId);
+        const [col, row, sheet] = parseCellId(cellId);
+        
+        // Ellenőrizzük, hogy a sor- és oszlopindexek túllépik-e a tábla aktuális méretét
+        if (row >= this.datarow.length) {
+            // Ha a sorindex túllépi a meglévő sorok számát, bővítjük a sorokat
+            const rowsToAdd = row - this.datarow.length + 1;
+            this.addRows(rowsToAdd);
+        }
+    
+        if (col >= this.datacol.length) {
+            // Ha az oszlopindex túllépi a meglévő oszlopok számát, bővítjük az oszlopokat
+            const colsToAdd = col - this.datacol.length + 1;
+            this.addCols(colsToAdd);
+        }
+    
         const cell = this.datarow[row].datacell[col];
         cell.setValue(value);
         cell.valuetype = valuetype;
@@ -832,7 +854,7 @@ class TROW {
     
         this.DOMTR.appendChild(rowHeaderCell);
     
-        this.addCells(sheet.colnum);
+        this.addCells(sheet.colnum());
     }
 
     applyStyleToElement(styleString) {
@@ -925,6 +947,14 @@ class TCOL {
         const headerRow = document.createElement('tr');
         const emptyHeaderCell = document.createElement('th');
         emptyHeaderCell.className="sticky-first-row";
+        emptyHeaderCell.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+
+            const options = [
+                { label: 'UnHide All Rows', action: (target) => target.sheet.unhideAllRows() },
+            ];
+            showContextMenu(event, this, options);
+        });
         headerRow.appendChild(emptyHeaderCell); // Empty top-left corner
     
         const th = document.createElement('th');
@@ -940,9 +970,14 @@ class TCOL {
             event.preventDefault();
 
             const options = [
-                { label: 'Filter Empty', action: (target) => target.filterRowsByEmpty(true) },
-                { label: 'Filter NonEmpty', action: (target) => target.filterRowsByEmpty(false) },      
-                { label: 'Filter disable', action: (target) => target.clearFilter() },          
+                {
+                    label: 'FILTER',
+                    submenu: [
+                        { label: 'Filter Empty', action: (target) => target.filterRowsByEmpty(true) },
+                        { label: 'Filter NonEmpty', action: (target) => target.filterRowsByEmpty(false) },      
+                        { label: 'Filter disable', action: (target) => target.clearFilter() },          
+                    ]
+                },
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
