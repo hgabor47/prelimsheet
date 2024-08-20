@@ -316,3 +316,7 @@ select {
     padding: 5px;    
     border:1px dotted #f0f0f0;
 }
+
+.ps_hashistory {
+    background-color: rgb(255, 252, 215) !important;
+}

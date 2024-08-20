@@ -2,6 +2,7 @@ cellclass = "ps_cell"
 cellselect= "ps_selected"
 cellinfo  = "ps_info"
 tableclass= "ps_table"
+hashistory= "ps_hashistory"
 
 function parseCellId(cellId) {
     let sheetName = null;
@@ -368,9 +369,12 @@ TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null, overrid
 
 
 /*<script src="xlsx.js"></script>*/
-TPRELIMSHEET.prototype.loadExcel = function(file, override = false) {
+TPRELIMSHEET.prototype.loadExcel = function(file, override = false,overrideuser=true) {
     const spreadsheet3 = this;
     const reader = new FileReader();
+    if (overrideuser){
+        spreadsheet3.setUser(file.name,"user");
+    }
 
     reader.onload = function(event) {
         const data = new Uint8Array(event.target.result);
