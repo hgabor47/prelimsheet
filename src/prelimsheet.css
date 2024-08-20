@@ -124,7 +124,19 @@ select {
 
 
 /* Háromszög a cella jobb felső sarkában */
-.triangle-indicator {
+.ps_info {
+    position: absolute;
+    width: var(--infosize);
+    height: var(--infosize);
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="0,0 100,100 100,0" fill="rgb(65, 214, 97)"/></svg>');
+    background-size: 8px; /* A háromszög mérete az elem méretének 50%-a */
+    background-repeat: no-repeat;
+    background-position: top right; /* A háromszög elhelyezése a jobb felső sarokban */
+    top: 0;
+    right: 0;
+    cursor: pointer;
+}
+.triangle-indicator2 {
     position: absolute;
     width: 0;
     height: 0;
@@ -143,7 +155,7 @@ select {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 50%;
+    width: 70%;
     background-color: white;
     color:black;
     padding: 20px;
@@ -276,4 +288,31 @@ select {
     position: sticky;
     top: var(--stickyrow);
     z-index: 2; /* Magasabb réteg, hogy a görgetés alatt is látszódjon */
+}
+
+/* A táblázat stílusa a history modális ablakban */
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.history-table th, .history-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.history-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.history-table textarea {
+    width: 100%;
+    height: 60px;
+    resize: vertical; /* Engedélyezi a méretezést mindkét irányban */
+    box-sizing: border-box; /* Figyelembe veszi a padding és border méreteit */
+    padding: 5px;    
+    border:1px dotted #f0f0f0;
 }

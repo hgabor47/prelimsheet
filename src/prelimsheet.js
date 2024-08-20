@@ -1,5 +1,6 @@
 cellclass = "ps_cell"
-cellselect = "ps_selected"
+cellselect= "ps_selected"
+cellinfo  = "ps_info"
 tableclass= "ps_table"
 
 function parseCellId(cellId) {
@@ -152,7 +153,16 @@ class TPRELIMSHEET {
                             this.selected.editCell(); // Trigger edit mode on the selected cell
                             event.preventDefault();
                             break;                  
-                    }
+                        case 'F3':
+                            this.selected.showInfoModal(); // Trigger edit mode on the selected cell
+                            event.preventDefault();
+                            break;                  
+                        case 'F4':
+                            this.selected.showHistoryModal(); // Trigger edit mode on the selected cell
+                            event.preventDefault();
+                            break;                  
+    
+                        }
                 }
             }
         });  
@@ -449,23 +459,69 @@ TPRELIMSHEET.prototype.convertToJson = function() {
             rows: []                         
         };
 
+        let previousCol = null;
+        let colCount = 0;
+
         sheet.datacol.forEach(col => {
-            sheetData.columns.push({
+            const colData = {
                 index: col.colindex,
                 width: col.width,
                 lastUsedColor: col.lastUsedColor, 
                 lastUsedBackgroundColor: col.lastUsedBackgroundColor 
-            });
+            };
+
+            if (previousCol && 
+                previousCol.width === colData.width && 
+                previousCol.lastUsedColor === colData.lastUsedColor && 
+                previousCol.lastUsedBackgroundColor === colData.lastUsedBackgroundColor) {
+                
+                colCount++;
+            } else {
+                if (previousCol) {
+                    previousCol.count = colCount;
+                    sheetData.columns.push(previousCol);
+                }
+                previousCol = { ...colData };
+                colCount = 1;
+            }
         });
 
-        sheet.datarow.forEach(row => {
-            sheetData.rows.push({
+        if (previousCol) {
+            previousCol.count = colCount;
+            sheetData.columns.push(previousCol);
+        }
+
+        let previousRow = null;
+        let rowCount = 0;
+
+        sheet.datarow.forEach((row, rowIndex) => {
+            const rowData = {
                 index: row.name,
                 height: row.height,
                 lastUsedColor: row.lastUsedColor, 
                 lastUsedBackgroundColor: row.lastUsedBackgroundColor 
-            });
+            };
+
+            if (previousRow && 
+                previousRow.height === rowData.height && 
+                previousRow.lastUsedColor === rowData.lastUsedColor && 
+                previousRow.lastUsedBackgroundColor === rowData.lastUsedBackgroundColor) {
+                
+                rowCount++;
+            } else {
+                if (previousRow) {
+                    previousRow.count = rowCount;
+                    sheetData.rows.push(previousRow);
+                }
+                previousRow = { ...rowData };
+                rowCount = 1;
+            }
         });
+
+        if (previousRow) {
+            previousRow.count = rowCount;
+            sheetData.rows.push(previousRow);
+        }
 
         sheet.datarow.forEach((row, rowIndex) => {
             row.datacell.forEach((cell, colIndex) => {
@@ -523,6 +579,7 @@ TPRELIMSHEET.prototype.loadFromFile = function(file) {
 
 TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
     const jsonData = JSON.parse(jsonString);
+    this.clearAll(false);
 
     if (jsonData.head.combos) {
         for (const [name, options] of Object.entries(jsonData.head.combos)) {
@@ -539,17 +596,23 @@ TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
         sheet.setSize(sheetData.size[0], sheetData.size[1]);
 
         sheetData.columns.forEach(col => {
-            const colObj = sheet.datacol[col.index];
-            colObj.setWidth(col.width);
-            colObj.lastUsedColor = col.lastUsedColor || '#000000'; 
-            colObj.lastUsedBackgroundColor = col.lastUsedBackgroundColor || '#ffffff'; 
+            const colCount = col.count || 1;
+            for (let i = 0; i < colCount; i++) {
+                const colObj = sheet.datacol[col.index + i];
+                colObj.setWidth(col.width);
+                colObj.lastUsedColor = col.lastUsedColor || '#000000'; 
+                colObj.lastUsedBackgroundColor = col.lastUsedBackgroundColor || '#ffffff'; 
+            }
         });
 
         sheetData.rows.forEach(row => {
-            const rowObj = sheet.datarow[row.index - 1];
-            rowObj.setHeight(row.height);
-            rowObj.lastUsedColor = row.lastUsedColor || '#000000'; 
-            rowObj.lastUsedBackgroundColor = row.lastUsedBackgroundColor || '#ffffff'; 
+            const rowCount = row.count || 1;
+            for (let i = 0; i < rowCount; i++) {
+                const rowObj = sheet.datarow[row.index - 1 + i];
+                rowObj.setHeight(row.height);
+                rowObj.lastUsedColor = row.lastUsedColor || '#000000'; 
+                rowObj.lastUsedBackgroundColor = row.lastUsedBackgroundColor || '#ffffff'; 
+            }
         });
 
         sheetData.cells.forEach(cellData => {
@@ -563,6 +626,17 @@ TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
             cell.readonly = cellData.readonly || false;
             cell.role = cellData.role || [];
             cell.info = cellData.info || "";
+
+            // Frissítjük a role alapú osztályokat (classes)
+            cell.updateRoleState();
+
+            // Frissítjük a readonly állapotot is a DOM class alapján
+            if (cell.readonly) {
+                cell.setClass('ps_readonly');
+            } else {
+                cell.removeClass('ps_readonly');
+            }
+
             cell.showInfo(cellData.info ? true : false);
         });
     });
@@ -570,7 +644,7 @@ TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
     this.showSheet(0);
 };
 
-TPRELIMSHEET.prototype.clearAll = function() {
+TPRELIMSHEET.prototype.clearAll = function(withuser=true) {
     // Táblázat adatainak törlése
     this.data.forEach(sheet => {
         if (sheet.DOMDIV && sheet.DOMDIV.parentElement) {
@@ -591,10 +665,11 @@ TPRELIMSHEET.prototype.clearAll = function() {
     // Az aktuális sheet indexének alaphelyzetbe állítása
     this.currentSheetIndex = 0;
 
-    // Felhasználói adatok alaphelyzetbe állítása
-    this.username = "";
-    this.userroles = [];
-
+    if (withuser){
+        // Felhasználói adatok alaphelyzetbe állítása
+        this.username = "";
+        this.userroles = [];
+    }
     // Fülek frissítése (mivel nincs sheet, ez üres lesz)
     this.updateTabs();
 };
@@ -1129,6 +1204,8 @@ class TCELL {
         this.edit = false;
         this.valuetype = null;
         this.role = []; // csak ezek írhatják, de ha üres: mindenki 
+        this.history = []; // Cella története
+        this.AISummary = ""; // Összegzés a cella története alapján        
         this.create(sheet, row, colindex);
         this.celltype=_CellTypes.NONE;
         this.comboTemplateName=null;
@@ -1140,6 +1217,7 @@ class TCELL {
         this.indicator = null; // Tároljuk a háromszög DOM elemét
         this.showInfo(false);
         this.styleIndex = null; // Stílus index a StyleManager-ben
+        this.oldvalue = "";
     } 
 
     /**
@@ -1219,7 +1297,7 @@ class TCELL {
             event.preventDefault();
 
             const options = [
-                { label: 'Edit', action: (target) => target.editCell() },
+                { label: 'Edit F2', action: (target) => target.editCell() },
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
                 { label: 'Color', action: (target) => applyColor(target, 'color') },
                 { label: 'BackGroundColor', action: (target) => applyColor(target, 'background-color') },
@@ -1240,7 +1318,9 @@ class TCELL {
                         { label: 'IMAGE', action: (target) => target.setCellType(_CellTypes.IMAGELINK) },
                         { label: 'COMBOBOX', action: (target) => target.setCellType(_CellTypes.COMBOBOX) },
                     ]
-                }
+                },
+                { label:'INFO F3',action: (target) => target.showInfoModal() },
+                { label:'HISTORY F4',action: (target) => target.showHistoryModal() }
             ];
             showContextMenu(event, this, options);
         });  
@@ -1255,23 +1335,15 @@ class TCELL {
     }
 
     addInfoIndicator() {
-        if (!this.indicator) {
-            this.indicator = document.createElement('div');
-            this.indicator.className = 'triangle-indicator';
-            this.TD.appendChild(this.indicator);
-
-            this.indicator.addEventListener('click', (event) => {
-                event.stopPropagation(); // Ne váltson ki más eseményeket, pl. cella kijelölését
-                this.showInfoModal();
-            });
-        }
+        this.removeClass(cellinfo);
+        this.setClass(cellinfo);
+        this.indicator=true;
     }
 
     removeInfoIndicator() {
         if (this.indicator) {
-            this.indicator.removeEventListener('click', this.showInfoModal); // Eltávolítjuk az eseménykezelőt
-            this.TD.removeChild(this.indicator);
-            this.indicator = null;
+            this.removeClass(cellinfo);
+            this.indicator = false;
         }
     }
 
@@ -1286,6 +1358,7 @@ class TCELL {
     }
 
     showInfoModal() {
+        if (this.info=="") return;
         const modalBackground = document.createElement('div');
         modalBackground.className = 'modal-background';
         document.body.appendChild(modalBackground);
@@ -1314,6 +1387,70 @@ class TCELL {
             modal.remove();
         });
     }    
+
+    showHistoryModal() {
+        if (this.history.length < 1) return;
+    
+        // Létrehozunk egy háttér divet és egy modális ablakot
+        const modalBackground = document.createElement('div');
+        modalBackground.className = 'modal-background';
+    
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+    
+        // A modális tartalom összeállítása fordított sorrendben
+        const historyRows = this.history.slice().reverse().map(entry => `
+            <tr>
+                <td style="width:160px;">
+                    <div>${entry.dt}</div>
+                    <div>${entry.user}</div>
+                </td>
+                <td>
+                    <textarea readonly>${entry.value}</textarea>
+                </td>
+            </tr>`).join('');
+    
+        const currentRow = `
+            <tr>
+                <td>
+                    <div>Jelenlegi tartalom</div>
+                    <div>${this.sheet.parent.username || 'Ismeretlen felhasználó'}</div>
+                </td>
+                <td>
+                    <textarea readonly>${this.getValue()}</textarea>
+                </td>
+            </tr>`;
+    
+        // A modális ablak belső HTML-je
+        modal.innerHTML = `
+            <table class="history-table">
+                ${currentRow}
+                ${historyRows}
+            </table>
+            <span class="modal-close">X</span>
+        `;
+    
+        // A modal és háttér hozzáadása a dokumentumhoz
+        document.body.appendChild(modalBackground);
+        document.body.appendChild(modal);
+    
+        // Megjelenítés és eseménykezelők hozzáadása
+        modalBackground.style.display = 'block';
+        modal.style.display = 'block';
+    
+        modal.querySelector('.modal-close').addEventListener('click', () => {
+            modalBackground.remove();
+            modal.remove();
+        });
+    
+        modalBackground.addEventListener('click', () => {
+            modalBackground.remove();
+            modal.remove();
+        });
+    }
+    
+    
+    
 
     setRole(roles) {
         this.role = roles;
@@ -1386,11 +1523,47 @@ class TCELL {
     }
 
     getValue() {
-        return this.TD.textContent;
+        return this.oldvalue;
+        //return this.TD.textContent;
     }
 
     setValue(value) {
-        this.TD.textContent = value;
+        // Mentjük a régi értéket a történetbe
+        const oldValue = this.getValue(); //this.sheet.parent.editCellOldValue;
+        const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+        const user = this.sheet.parent.username;
+        if (oldValue !== value) {
+            this.history.push({
+                dt: timestamp,
+                value: oldValue,
+                user: user
+            });
+            this.sheet.parent.editCellOldValue=value;
+        }
+        this.oldvalue = value;
+        this.TD.textContent = value;      
+    }
+
+    updateAISummary() {
+        // A history összegzése
+        let summary = this.history.map(entry => {
+            return `${entry.dt}: ${entry.user} írta: ${entry.value}`;
+        }).join('\n');
+
+        // Az aktuális tartalom hozzáadása
+        const currentContent = this.getValue();
+        summary += `\naktuális tartalom: ${currentContent}`;
+
+        // Beállítjuk az AISummary-t
+        this.AISummary = this.AIFunction(summary);
+    }
+
+    // dummy függvény, ami jelenleg csak kiírja a summary-t a konzolra, de majdan egy összegzést ad..
+    AIFunction(summary) {
+        console.log("AISummary processed:", summary);
+        // Itt lehetne majd hívni egy AI feldolgozó API-t, stb.
+        return summary; // egyelőr nem hív sy emmit
+
     }
 
     setClass(classname) {
@@ -1417,6 +1590,7 @@ class TCELL {
 class TEditCell {
     constructor(parentCell) {
         this.parentCell = parentCell;
+        this.exit = null;
     }
 
     attach() {
@@ -1435,15 +1609,17 @@ class TEditCell {
         this.DOMElement.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
-                this.parentCell.setValue(this.getValue());
-                //this.detach(); // Remove the editor element
+                //this.parentCell.setValue(this.getValue());
+                this.detach(); // Remove the editor element
             } else if (event.key === 'Escape') {
                 event.preventDefault();
+                this.exit=event.key;
                 this.detach(); // Remove the editor element without saving
             }
         });
         this.DOMElement.addEventListener('blur', () => {
-            this.parentCell.setValue(this.getValue());
+            if ( this.exit==null )
+                this.parentCell.setValue(this.getValue());
             this.detach()
         });
 
