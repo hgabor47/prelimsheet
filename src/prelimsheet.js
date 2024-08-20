@@ -453,8 +453,8 @@ TPRELIMSHEET.prototype.convertToJson = function() {
             sheetData.columns.push({
                 index: col.colindex,
                 width: col.width,
-                lastUsedColor: col.lastUsedColor, // Mentjük az utoljára használt színt
-                lastUsedBackgroundColor: col.lastUsedBackgroundColor // Mentjük az utoljára használt háttérszínt
+                lastUsedColor: col.lastUsedColor, 
+                lastUsedBackgroundColor: col.lastUsedBackgroundColor 
             });
         });
 
@@ -462,8 +462,8 @@ TPRELIMSHEET.prototype.convertToJson = function() {
             sheetData.rows.push({
                 index: row.name,
                 height: row.height,
-                lastUsedColor: row.lastUsedColor, // Mentjük az utoljára használt színt
-                lastUsedBackgroundColor: row.lastUsedBackgroundColor // Mentjük az utoljára használt háttérszínt
+                lastUsedColor: row.lastUsedColor, 
+                lastUsedBackgroundColor: row.lastUsedBackgroundColor 
             });
         });
 
@@ -479,7 +479,13 @@ TPRELIMSHEET.prototype.convertToJson = function() {
                     role: cell.role,          
                     info: cell.info           
                 };
-                sheetData.cells.push(cellData);
+
+                // Ellenőrizzük, hogy a cella nem üres-e, azaz van-e bármilyen hasznos adat
+                if (cellData.value !== "" || cellData.styleIndex !== null || cellData.type !== _CellTypes.NONE || 
+                    cellData.comboTemplateName !== null || cellData.readonly || cellData.role.length > 0 || 
+                    cellData.info !== "") {
+                    sheetData.cells.push(cellData);
+                }
             });
         });
 
@@ -535,21 +541,23 @@ TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
         sheetData.columns.forEach(col => {
             const colObj = sheet.datacol[col.index];
             colObj.setWidth(col.width);
-            colObj.lastUsedColor = col.lastUsedColor || '#000000'; // Visszatöltjük az utoljára használt színt
-            colObj.lastUsedBackgroundColor = col.lastUsedBackgroundColor || '#ffffff'; // Visszatöltjük az utoljára használt háttérszínt
+            colObj.lastUsedColor = col.lastUsedColor || '#000000'; 
+            colObj.lastUsedBackgroundColor = col.lastUsedBackgroundColor || '#ffffff'; 
         });
 
         sheetData.rows.forEach(row => {
             const rowObj = sheet.datarow[row.index - 1];
             rowObj.setHeight(row.height);
-            rowObj.lastUsedColor = row.lastUsedColor || '#000000'; // Visszatöltjük az utoljára használt színt
-            rowObj.lastUsedBackgroundColor = row.lastUsedBackgroundColor || '#ffffff'; // Visszatöltjük az utoljára használt háttérszínt
+            rowObj.lastUsedColor = row.lastUsedColor || '#000000'; 
+            rowObj.lastUsedBackgroundColor = row.lastUsedBackgroundColor || '#ffffff'; 
         });
 
         sheetData.cells.forEach(cellData => {
             const cell = sheet.getCell(cellData.id);
             cell.setValue(cellData.value);
-            cell.applyStyleByIndex(cellData.styleIndex);  
+            if (cellData.styleIndex !== null) {
+                cell.applyStyleByIndex(cellData.styleIndex);
+            }
             cell.celltype = cellData.type || _CellTypes.NONE;
             cell.comboTemplateName = cellData.comboTemplateName || null;
             cell.readonly = cellData.readonly || false;
