@@ -568,13 +568,14 @@ TPRELIMSHEET.prototype.convertToJson = function() {
                     comboTemplateName: cell.comboTemplateName,  
                     readonly: cell.readonly,  
                     role: cell.role,          
-                    info: cell.info           
+                    info: cell.info,
+                    history: cell.history      // History adatok hozzáadása
                 };
 
                 // Ellenőrizzük, hogy a cella nem üres-e, azaz van-e bármilyen hasznos adat
                 if (cellData.value !== "" || cellData.styleIndex !== null || cellData.type !== _CellTypes.NONE || 
                     cellData.comboTemplateName !== null || cellData.readonly || cellData.role.length > 0 || 
-                    cellData.info !== "") {
+                    cellData.info !== "" || cellData.history.length > 0) {  // History ellenőrzése is
                     sheetData.cells.push(cellData);
                 }
             });
@@ -673,6 +674,10 @@ TPRELIMSHEET.prototype.convertFromJson = function(jsonString) {
             cell.readonly = cellData.readonly || false;
             cell.role = cellData.role || [];
             cell.info = cellData.info || "";
+            cell.history = cellData.history || [];  // History adatok visszaállítása
+
+            // History osztály hozzáadása, ha szükséges
+            cell.addHistoryClass();
 
             // Frissítjük a role alapú osztályokat (classes)
             cell.updateRoleState();
@@ -722,7 +727,11 @@ TPRELIMSHEET.prototype.clearAll = function(withuser=true) {
 };
 
 
-
+TPRELIMSHEET.prototype.clearHistory = function() {
+    this.data.forEach(sheet => {
+        sheet.clearSheetHistory();
+    });
+};
 
 
 class TSHEET {
@@ -923,6 +932,16 @@ class TSHEET {
     }    
 }
 
+TSHEET.prototype.clearSheetHistory = function() {
+    this.datarow.forEach(row => {
+        row.datacell.forEach(cell => {
+            cell.clearCellHistory();
+        });
+    });
+};
+
+
+
 class TROW {
     constructor(sheet, name) {
         this.sheet = sheet;
@@ -1105,7 +1124,9 @@ class TCOL {
                     submenu: [
                         { label: 'Filter Empty', action: (target) => target.filterRowsByEmpty(true) },
                         { label: 'Filter NonEmpty', action: (target) => target.filterRowsByEmpty(false) },      
-                        { label: 'Filter disable', action: (target) => target.clearFilter() },          
+                        { label: 'Filter Has history', action: (target) => target.applyFilterByHistory(true) },  // Új menüpont
+                        { label: 'Filter Has no history', action: (target) => target.applyFilterByHistory(false) },  // Új menüpont                                
+                        { label: 'Filter disable', action: (target) => target.clearFilter() },  
                     ]
                 },
                 { label: 'Remove Formats', action: (target) => target.setStyle('') },
@@ -1164,6 +1185,18 @@ class TCOL {
         });
     }
 
+    // cellák history szűrésére
+    applyFilterByHistory(hasHistory) {
+        this.sheet.datarow.forEach(row => {
+            const cell = row.datacell[this.colindex];
+            if (hasHistory) {
+                row.setVisible(cell.history.length > 0);
+            } else {
+                row.setVisible(cell.history.length === 0);
+            }
+        });
+    }
+    
     filterRowsByEmpty(isEmpty) {
         this.sheet.datarow.forEach(row => {
             const cell = row.datacell[this.colindex];
@@ -1599,7 +1632,7 @@ class TCELL {
             this.removeClass('ps_hashistory');
         }
     }
-    
+
     updateAISummary() {
         // A history összegzése
         let summary = this.history.map(entry => {
@@ -1642,6 +1675,12 @@ class TCELL {
         }
     }
 }
+
+TCELL.prototype.clearCellHistory = function() {
+    this.history = []; // Történet törlése
+    this.removeClass('ps_hashistory'); // ps_hashistory osztály eltávolítása
+};
+
 
 class TEditCell {
     constructor(parentCell) {
