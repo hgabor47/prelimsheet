@@ -330,11 +330,11 @@ class TPRELIMSHEET {
     }
 }
 
-TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null) {
+TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null, override = false) {
     const spreadsheet3 = this;
     // CSV feldolgozása: sorokra bontás
     const rows = csvcontent.split('\n').map(row => row.split(','));
-    
+
     // Meghatározni a sorok és oszlopok számát
     const numRows = rows.length;
     const numCols = Math.max(...rows.map(row => row.length));
@@ -344,12 +344,14 @@ TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null) {
         // Ha sheetindex null, akkor új sheet létrehozása
         sheet = this.addSheet(`Sheet${this.data.length + 1}`);
     } else {
-        // Egyébként a meglévő sheet kiválasztása
+        // Meglévő sheet kiválasztása
         sheet = this.data[sheetindex];
     }
 
-    // Sheet méretének beállítása a CSV adatok alapján
-    sheet.setSize(numRows, numCols);
+    // Sheet méretének beállítása a CSV adatok alapján, ha nincs override
+    if (!override) {
+        sheet.setSize(numRows, numCols);
+    }
 
     // Cellák kitöltése a CSV tartalmával
     rows.forEach((row, rowIndex) => {
@@ -360,24 +362,45 @@ TPRELIMSHEET.prototype.loadcsv = function(csvcontent, sheetindex = null) {
     });
 
     if (typeof spreadsheet3.onload === 'function') {
-        spreadsheet3.onload(spreadsheet3,sheet); // Eseményhívás betöltéskor
+        spreadsheet3.onload(spreadsheet3, sheet); // Eseményhívás betöltéskor
     }
 };
 
+
 /*<script src="xlsx.js"></script>*/
-TPRELIMSHEET.prototype.loadExcel = function(file) {
+TPRELIMSHEET.prototype.loadExcel = function(file, override = false) {
     const spreadsheet3 = this;
     const reader = new FileReader();
+
     reader.onload = function(event) {
         const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: 'array', cellStyles: true });
 
         workbook.SheetNames.forEach(function(sheetName) {
+            let sheet;
+            let isAdd=false;
+
+            if (override) {
+                // Ha override, akkor megpróbáljuk megkeresni a létező sheetet név alapján
+                sheet = spreadsheet3.getSheet(sheetName);
+                if (!sheet) {
+                    // Ha nem található, akkor létrehozzuk
+                    sheet = spreadsheet3.addSheet(sheetName);
+                    isAdd=true;
+                }
+            } else {
+                // Ha nincs override, akkor új sheet létrehozása
+                sheet = spreadsheet3.addSheet(sheetName);
+                isAdd=true;
+            }
+
             const worksheet = workbook.Sheets[sheetName];
             const range = XLSX.utils.decode_range(worksheet['!ref']); // Teljes tartomány lekérése
-            const newSheet = spreadsheet3.addSheet(sheetName);
 
-            newSheet.setSize(range.e.r + 1, range.e.c + 1); // Méretezés a teljes tartomány alapján
+            // Sheet méretének beállítása a CSV adatok alapján, ha nincs override
+            if (isAdd) {
+                sheet.setSize(range.e.r + 1, range.e.c + 1); // Méretezés a teljes tartomány alapján
+            }
 
             for (let rowIndex = range.s.r; rowIndex <= range.e.r; rowIndex++) {
                 for (let colIndex = range.s.c; colIndex <= range.e.c; colIndex++) {
@@ -386,8 +409,10 @@ TPRELIMSHEET.prototype.loadExcel = function(file) {
 
                     if (cell) {
                         const cellName = toCellName([colIndex, rowIndex]);
-                        const cellDOM = newSheet.getCell(cellName);
-                        cellDOM.setValue(cell.v); // Cell value beállítása
+                        if (cell.v == null) cell.v="";
+                        sheet.setCellValue(cellName,cell.v);
+                        //const cellDOM = sheet.getCell(cellName);
+                        //cellDOM.setValue(cell.v); // Cell value beállítása
 
                         // Stílusindex alapján formázás lekérése és alkalmazása
                         if (cell.s) {
@@ -432,14 +457,20 @@ TPRELIMSHEET.prototype.loadExcel = function(file) {
                 }
             }
 
-            spreadsheet3.showSheet(spreadsheet3.data.length - 1);
+            // Ha override volt, akkor nem szükséges megjeleníteni az új sheetet, mert már létezett
+            if (!override) {
+                spreadsheet3.showSheet(spreadsheet3.data.length - 1);
+            }
+
             if (typeof spreadsheet3.onload === 'function') {
-                spreadsheet3.onload(spreadsheet3,null); // Eseményhívás betöltéskor
+                spreadsheet3.onload(spreadsheet3, null); // Eseményhívás betöltéskor
             }
         });
     };
+
     reader.readAsArrayBuffer(file);
-}
+};
+
 
 TPRELIMSHEET.prototype.convertToJson = function() {
     const json = {
@@ -564,6 +595,18 @@ TPRELIMSHEET.prototype.saveToFile = function(filename, data) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
+TPRELIMSHEET.prototype.csvFromFile = function(file,sheetindex=null,override=false) {
+    const spreadsheet = this;
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+        const csvContent = event.target.result;
+        spreadsheet.loadcsv(csvContent,sheetindex,override);
+    };
+    
+    reader.readAsText(file);
+};
 
 TPRELIMSHEET.prototype.loadFromFile = function(file) {
     const spreadsheet = this;

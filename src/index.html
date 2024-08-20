@@ -32,13 +32,16 @@
 
     <!-- Load gomb -->
     <input type="file" id="file-input" style="display:none;" accept=".xlsx, .xls" />
-    <button class="btn btn-success" onclick="document.getElementById('file-input').click();">LOAD</button>    
+    <button class="btn btn-success" onclick="document.getElementById('file-input').click();">LOAD XLSX</button>    
 
-    <button id="SAVE" class="btn btn-secondary" >SAVE</button>
+    <button class="btn btn-warning" onclick="document.getElementById('csv-file-input').click();">LOAD CSV</button>
+    <input type="file" id="csv-file-input" style="display:none;" accept=".csv" />
 
     <button class="btn btn-warning" onclick="document.getElementById('json-file-input').click();">LOAD JSON</button>
     <input type="file" id="json-file-input" style="display:none;" accept=".json" />
-    
+
+    <button id="SAVE" class="btn btn-secondary" >SAVE JSON</button>
+
     <button class="btn btn-danger" onclick="spreadsheet.clearAll();">Clear All</button>
 
     <script>
@@ -108,7 +111,7 @@
         document.getElementById('file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                spreadsheet.loadExcel(file);
+                spreadsheet.loadExcel(file,true);
             }
         });
 
@@ -121,6 +124,12 @@
             if (file) {
                 spreadsheet.clearAll();  // Táblázat alaphelyzetbe állítása a betöltés előtt
                 spreadsheet.loadFromFile(file);
+            }
+        });
+        document.getElementById('csv-file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                spreadsheet.csvFromFile(file,1,true);
             }
         });
 
