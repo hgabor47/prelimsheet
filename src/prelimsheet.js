@@ -1586,11 +1586,20 @@ class TCELL {
                 user: user
             });
             this.sheet.parent.editCellOldValue=value;
+            this.addHistoryClass(); 
         }
         this.oldvalue = value;
         this.TD.textContent = value;      
     }
 
+    addHistoryClass() {
+        if (this.history.length > 0) {
+            this.setClass('ps_hashistory');
+        } else {
+            this.removeClass('ps_hashistory');
+        }
+    }
+    
     updateAISummary() {
         // A history összegzése
         let summary = this.history.map(entry => {
