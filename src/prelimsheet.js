@@ -733,14 +733,21 @@ TPRELIMSHEET.prototype.clearHistory = function() {
     });
 };
 
+TPRELIMSHEET.prototype.consolidateHistory = function() {
+    this.data.forEach(sheet => {
+        sheet.consolidateSheetHistory();
+    });
+};
+
+
 
 class TSHEET {
     constructor(parent, name = '') {
         this.parent = parent;
         this.DOMDIV = null;
         this.name = name;
-        this.datarow = [];
-        this.datacol = [];
+        this.datarow = []; //TROW
+        this.datacol = []; //TCOL
         this.create(parent);
     }
 
@@ -839,10 +846,7 @@ class TSHEET {
             }
         }
     }
-    setCell(area = "",func) {
-        // Meghatározzuk az érintett területet az area függvénnyel
-        const [x1, y1, x2, y2] = this.area(area);
-
+    setCellByPos(x1, y1, x2, y2,func) {
         // Végigmegyünk a területen, és beállítjuk a cella típusát
         for (let rowIndex = y1; rowIndex <= y2; rowIndex++) {
             for (let colIndex = x1; colIndex <= x2; colIndex++) {
@@ -850,6 +854,11 @@ class TSHEET {
                 func(cell)                
             }
         }
+    }
+    setCell(area = "",func) {
+        // Meghatározzuk az érintett területet az area függvénnyel
+        const [x1, y1, x2, y2] = this.area(area);
+        this.setCellByPos(x1,y1,x2,y2,func);
     }
 
     setCellReadonly(yes, area = "") {
@@ -940,6 +949,13 @@ TSHEET.prototype.clearSheetHistory = function() {
     });
 };
 
+TSHEET.prototype.consolidateSheetHistory = function() {
+    this.datarow.forEach(row => {
+        row.datacell.forEach(cell => {
+            cell.consolidateCellHistory();
+        });
+    });
+};
 
 
 class TROW {
@@ -1078,6 +1094,12 @@ class TROW {
 }
 
 
+const _HistoryTypes = {
+    NONE:0,
+    ALL: 10,
+    CHANGED: 20
+};
+
 class TCOL {
     constructor(sheet,colindex) {
         this.sheet = sheet;
@@ -1087,6 +1109,7 @@ class TCOL {
         this.width=170;    
         this.lastUsedColor = '#000000'; 
         this.lastUsedBackgroundColor = '#ffffff';
+        this.hasHistory = _HistoryTypes.NONE;
         this.createHeaders();  
     }
 
@@ -1122,6 +1145,7 @@ class TCOL {
                 {
                     label: 'FILTER',
                     submenu: [
+                        { label: 'UnHide All Rows', action: (target) => target.sheet.unhideAllRows() },
                         { label: 'Filter Empty', action: (target) => target.filterRowsByEmpty(true) },
                         { label: 'Filter NonEmpty', action: (target) => target.filterRowsByEmpty(false) },      
                         { label: 'Filter Has history', action: (target) => target.applyFilterByHistory(true) },  // Új menüpont
@@ -1149,6 +1173,14 @@ class TCOL {
                         { label: 'IMAGE', action: (target) => target.setCellType(_CellTypes.IMAGELINK) },
                         { label: 'COMBOBOX', action: (target) => target.setCellType(_CellTypes.COMBOBOX) },
                     ]
+                },
+                {
+                    label: 'History',
+                    submenu: [
+                        { label: 'All', action: (target) => target.setHistory(_HistoryTypes.ALL) },
+                        { label: 'Changed only', action: (target) => target.setHistory(_HistoryTypes.CHANGED) },
+                        { label: 'Off', action: (target) => target.setHistory(_HistoryTypes.NONE) },
+                    ]
                 }
             ];
             showContextMenu(event, this, options);
@@ -1162,7 +1194,11 @@ class TCOL {
         }
         //this.sheet.DOMDIV.insert   appendChild(headerRow);
 
-    }    
+    }
+    
+    setHistory(typ=_HistoryTypes.CHANGED){
+        this.sheet.datacol[this.colindex].hasHistory=typ;
+    }
 
     applyStyleToElement(styleString) {
         this.sheet.datarow.forEach(row => {
@@ -1186,10 +1222,10 @@ class TCOL {
     }
 
     // cellák history szűrésére
-    applyFilterByHistory(hasHistory) {
+    applyFilterByHistory(on) {
         this.sheet.datarow.forEach(row => {
             const cell = row.datacell[this.colindex];
-            if (hasHistory) {
+            if (on) {
                 row.setVisible(cell.history.length > 0);
             } else {
                 row.setVisible(cell.history.length === 0);
@@ -1610,17 +1646,23 @@ class TCELL {
     setValue(value) {
         // Mentjük a régi értéket a történetbe
         const oldValue = this.getValue(); //this.sheet.parent.editCellOldValue;
-        const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
-        const user = this.sheet.parent.username;
         if (oldValue !== value) {
+            this.sheet.parent.editCellOldValue=value;
+        }
+        if ( this.sheet.datacol[this.colindex].hasHistory==_HistoryTypes.ALL  && ( value  )
+            || 
+            (this.sheet.datacol[this.colindex].hasHistory==_HistoryTypes.CHANGED && oldValue !== value )
+        ){            
+            const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+            const user = this.sheet.parent.username;
             this.history.push({
                 dt: timestamp,
                 value: oldValue,
                 user: user
-            });
-            this.sheet.parent.editCellOldValue=value;
-            this.addHistoryClass(); 
-        }
+            });        
+            this.addHistoryClass();     
+        }            
+        
         this.oldvalue = value;
         this.TD.textContent = value;      
     }
@@ -1679,6 +1721,28 @@ class TCELL {
 TCELL.prototype.clearCellHistory = function() {
     this.history = []; // Történet törlése
     this.removeClass('ps_hashistory'); // ps_hashistory osztály eltávolítása
+};
+
+TCELL.prototype.consolidateCellHistory = function() {
+    if (this.history.length === 0) return;
+
+    // Egyedi értékek összegyűjtése (distinct)
+    const distinctValues = [...new Set(this.history.map(entry => entry.value))];
+
+    // Jelenlegi érték hozzáadása, ha még nincs benne
+    const currentValue = this.getValue();
+    if (!distinctValues.includes(currentValue)) {
+        distinctValues.push(currentValue);
+    }
+
+    // Az egyesített tartalom beállítása a cella aktuális értékeként
+    this.setValue(distinctValues.join("\n"));
+
+    // History törlése
+    this.history = [];
+
+    // ps_hashistory osztály eltávolítása
+    this.removeClass('ps_hashistory');
 };
 
 
